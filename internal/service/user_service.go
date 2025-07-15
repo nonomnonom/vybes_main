@@ -35,10 +35,15 @@ type UserProfileResponse struct {
 	FriendshipStatus string `json:"friendshipStatus"`
 }
 
+type UserMinimal struct {
+	VID      int64  `json:"vid"`
+	Username string `json:"username"`
+}
+
 type LoginResponse struct {
-	AccessToken  string     `json:"access_token"`
-	RefreshToken string     `json:"refresh_token"`
-	UserData     *domain.User `json:"user_data"`
+	AccessToken  string      `json:"access_token"`
+	RefreshToken string      `json:"refresh_token"`
+	UserData     *UserMinimal `json:"user_data"`
 }
 
 // UserService defines the interface for user business logic.
@@ -155,7 +160,7 @@ func (s *userService) Login(ctx context.Context, email, password, userAgent, cli
 	return &LoginResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
-		UserData:     user,
+		UserData:     &UserMinimal{VID: user.VID, Username: user.Username},
 	}, nil
 }
 
@@ -188,7 +193,7 @@ func (s *userService) RefreshToken(ctx context.Context, refreshToken string) (*L
 	return &LoginResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
-		UserData:     user,
+		UserData:     &UserMinimal{VID: user.VID, Username: user.Username},
 	}, nil
 }
 
