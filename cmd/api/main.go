@@ -71,12 +71,14 @@ func main() {
 	reactionRepository := repository.NewMongoReactionRepository(db)
 	bookmarkRepository := repository.NewMongoBookmarkRepository(db)
 	notificationRepository := repository.NewMongoNotificationRepository(db)
+	sessionRepository := repository.NewSessionRepository(db)
 
 	// Initialize services
 	emailService := service.NewResendEmailService(cfg)
 	walletService := service.NewWalletService(cfg)
 	notificationService := service.NewNotificationService(notificationRepository)
-	userService := service.NewUserService(userRepository, followRepository, counterRepository, walletService, emailService, cacheClient, cfg.JWTSecret, cfg.WalletEncryptionKey)
+	sessionService := service.NewSessionService(sessionRepository)
+	userService := service.NewUserService(userRepository, followRepository, counterRepository, sessionRepository, walletService, emailService, sessionService, cacheClient, cfg.JWTSecret, cfg.WalletEncryptionKey)
 	followService := service.NewFollowService(followRepository, userRepository, notificationPublisher)
 	suggestionService := service.NewSuggestionService(userRepository, followRepository)
 	storyService := service.NewStoryService(storyRepository, followRepository, storageClient, cfg)
@@ -104,9 +106,10 @@ func main() {
 	bookmarkHandler := httphandler.NewBookmarkHandler(bookmarkService)
 	searchHandler := httphandler.NewSearchHandler(searchService)
 	notificationHandler := httphandler.NewNotificationHandler(notificationService)
+	sessionHandler := httphandler.NewSessionHandler(sessionService)
 
 	// Setup router
-	router := httphandler.SetupRouter(userHandler, followHandler, suggestionHandler, storyHandler, contentHandler, reactionHandler, feedHandler, bookmarkHandler, searchHandler, notificationHandler, cfg)
+	router := httphandler.SetupRouter(userHandler, followHandler, suggestionHandler, storyHandler, contentHandler, reactionHandler, feedHandler, bookmarkHandler, searchHandler, notificationHandler, sessionHandler, sessionService, cfg)
 
 	// Setup robust HTTP server
 	server := &http.Server{

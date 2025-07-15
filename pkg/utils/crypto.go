@@ -61,3 +61,12 @@ func Decrypt(encryptedString string, keyString string) (string, error) {
 
 	return string(plaintext), nil
 }
+
+// GenerateRandomString generates a random string of a given length.
+func GenerateRandomString(length int) (string, error) {
+	bytes := make([]byte, length)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
+}

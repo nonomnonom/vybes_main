@@ -4,9 +4,9 @@ import (
 	
 	"vybes/internal/config"
 	"vybes/internal/middleware"
+	"vybes/internal/service"
 
 	"github.com/gin-gonic/gin"
-	"golang.org/x/time/rate"
 )
 
 // SetupRouter initializes the Gin router and sets up the routes.
@@ -21,12 +21,11 @@ func SetupRouter(
 	bookmarkHandler *BookmarkHandler,
 	searchHandler *SearchHandler,
 	notificationHandler *NotificationHandler,
+	sessionHandler *SessionHandler,
+	sessionService *service.SessionService,
 	cfg *config.Config,
 ) *gin.Engine {
 	router := gin.Default()
-
-	// Create a rate limiter: 1000 requests per minute with a burst of 100.
-	limiter := middleware.RateLimiterMiddleware(rate.Limit(1000.0/60.0), 100)
 
 	// API v1 routes
 	apiV1 := router.Group("/api/v1")
@@ -39,9 +38,10 @@ func SetupRouter(
 		publicUserRoutes := apiV1.Group("/users")
 		{
 			publicUserRoutes.POST("/register", userHandler.Register)
-			publicUserRoutes.POST("/login", limiter, userHandler.Login)
-			publicUserRoutes.POST("/request-otp", limiter, userHandler.RequestOTP)
-			publicUserRoutes.POST("/reset-password", limiter, userHandler.ResetPassword)
+			publicUserRoutes.POST("/login", userHandler.Login)
+			publicUserRoutes.POST("/refresh", userHandler.RefreshToken)
+			publicUserRoutes.POST("/request-otp", userHandler.RequestOTP)
+			publicUserRoutes.POST("/reset-password", userHandler.ResetPassword)
 		}
 
 		publicPostRoutes := apiV1.Group("/posts")
@@ -51,7 +51,7 @@ func SetupRouter(
 
 		// Authenticated routes
 		authRoutes := apiV1.Group("/")
-		authRoutes.Use(middleware.AuthMiddleware(cfg))
+		authRoutes.Use(middleware.AuthMiddleware(cfg, sessionService))
 		{
 			// Search routes
 			authRoutes.GET("/search/users", searchHandler.SearchUsers)
@@ -59,6 +59,7 @@ func SetupRouter(
 			// User profile and wallet routes
 			authRoutes.GET("/users/:username", userHandler.GetUserProfile)
 			authRoutes.PATCH("/users/me", userHandler.UpdateProfile)
+			authRoutes.POST("/wallet/unlock", userHandler.UnlockWallet)
 			authRoutes.POST("/wallet/export", userHandler.ExportPrivateKey)
 			authRoutes.POST("/wallet/personal-sign", userHandler.PersonalSign)
 			authRoutes.POST("/wallet/sign-transaction", userHandler.SignTransaction)
@@ -104,6 +105,13 @@ func SetupRouter(
 			{
 				notifications.GET("/", notificationHandler.GetNotifications)
 				notifications.PATCH("/read", notificationHandler.MarkAsRead)
+			}
+
+			// Session routes
+			sessions := authRoutes.Group("/sessions")
+			{
+				sessions.GET("/:id", sessionHandler.GetSession)
+				sessions.POST("/:id/block", sessionHandler.BlockSession)
 			}
 		}
 	}

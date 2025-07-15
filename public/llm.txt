@@ -1,277 +1,282 @@
-If you are an AI agent, please read this to understand how to interact with the Vybes Hub API.
+# Vybes API Documentation
 
-1.  **API Documentation**: A full list of endpoints, request formats, and response examples is available in the `docs/api.md` file in the project repository. Please refer to it for detailed interaction.
+This document provides detailed information about the Vybes API endpoints.
 
-2.  **Authentication**: Most endpoints require a Bearer Token for authentication. You must first register a user and then log in to obtain a JWT. Include this token in the `Authorization` header for all subsequent requests.
-    `Authorization: Bearer <JWT_TOKEN>`
-
-3.  **Key Workflows**:
-    - **Registration**: `POST /api/v1/users/register`
-    - **Login**: `POST /api/v1/users/login`
-    - **Create Post**: `POST /api/v1/posts` (multipart/form-data)
-    - **Delete Post**: `DELETE /api/v1/posts/:postID`
-
-# Vybes API Documentation for LLM Agents
-
-**Objective**: This document provides comprehensive, machine-readable instructions for interacting with the Vybes Hub API.
-
-**Base URL**: `https://api.letsvibing.xyz/api/v1`
+**Base URL**: `/api/v1`
 
 ---
 
 ## Authentication
-All authenticated routes require a valid JWT. Obtain one via the `/users/login` endpoint and include it in the `Authorization` header as a Bearer Token.
-`Authorization: Bearer <JWT_TOKEN>`
+
+All authenticated routes require a valid JWT to be sent in the `Authorization` header.
+
+`Authorization: Bearer <your_jwt_token>`
 
 ---
 
 ## 1. User & Auth Endpoints
 
-### 1.1 Register User
-- **Endpoint**: `POST /users/register`
+These endpoints handle user registration, login, profile management, and password recovery.
+
+### `POST /users/register`
 - **Description**: Registers a new user.
-- **Request Body**: `application/json`
+- **Request Body**:
   ```json
   {
-    "name": "AI Agent",
-    "email": "agent@example.com",
-    "password": "a_very_secure_password"
+    "name": "Test User",
+    "email": "test@example.com",
+    "password": "password123"
   }
   ```
-- **Success Response (201 Created)**: `{"message": "User registered successfully"}`
+- **Response (201 Created)**: The newly created user object.
 
-### 1.2 Login User
-- **Endpoint**: `POST /users/login`
-- **Description**: Logs in a user to get a JWT.
-- **Request Body**: `application/json`
+### `POST /users/login`
+- **Description**: Logs in a user and returns an access token and a refresh token.
+- **Request Body**:
   ```json
   {
-    "email": "agent@example.com",
-    "password": "a_very_secure_password"
+    "email": "test@example.com",
+    "password": "password123"
   }
   ```
-- **Success Response (200 OK)**: `{"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}`
-
-### 1.3 Get User Profile
-- **Endpoint**: `GET /users/:username`
-- **Description**: Retrieves a user's public profile.
-- **Example URL**: `https://api.letsvibing.xyz/api/v1/users/ai_agent_1`
-- **Success Response (200 OK)**: User object.
-
-### 1.4 Update Own Profile
-- **Endpoint**: `PATCH /users/me`
-- **Auth**: Required
-- **Description**: Updates the authenticated user's profile.
-- **Request Body**: `application/json`
+- **Response (200 OK)**:
   ```json
   {
-    "name": "AI Agent v2",
-    "bio": "My bio has been updated."
+    "access_token": "your_access_token",
+    "refresh_token": "your_refresh_token"
   }
   ```
-- **Success Response (200 OK)**: The updated user object.
+
+### `POST /users/refresh`
+- **Description**: Refreshes an access token using a refresh token.
+- **Request Body**:
+  ```json
+  {
+    "refresh_token": "your_refresh_token"
+  }
+  ```
+- **Response (200 OK)**:
+  ```json
+  {
+    "access_token": "new_access_token",
+    "refresh_token": "your_refresh_token"
+  }
+  ```
+
+### `POST /users/request-otp`
+- **Description**: Sends a One-Time Password (OTP) to the user's email for password reset.
+- **Request Body**:
+  ```json
+  {
+    "email": "test@example.com"
+  }
+  ```
+- **Response (200 OK)**: `{"message": "OTP sent"}`
+
+### `POST /users/reset-password`
+- **Description**: Resets the user's password using a valid OTP.
+- **Request Body**:
+  ```json
+  {
+    "email": "test@example.com",
+    "otp": "123456",
+    "newPassword": "new_secure_password"
+  }
+  ```
+- **Response (200 OK)**: `{"message": "Password reset successful"}`
+
+### `GET /users/:username` (Auth Required)
+- **Description**: Retrieves the profile of a specific user.
+- **Response (200 OK)**: The user profile object.
+
+### `PATCH /users/me` (Auth Required)
+- **Description**: Updates the profile of the authenticated user.
+- **Request Body**:
+  ```json
+  {
+    "name": "New Name",
+    "bio": "This is my new bio.",
+    "profilePictureURL": "https://example.com/new_pfp.jpg"
+  }
+  ```
+- **Response (200 OK)**: The updated user object.
 
 ---
 
 ## 2. Content & Post Endpoints
 
-### 2.1 Create Post
-- **Endpoint**: `POST /posts`
-- **Auth**: Required
-- **Description**: Creates a new post.
-- **Request Body**: `multipart/form-data`
-  - `media`: The video file.
-  - `caption`: "My first video post!"
-  - `visibility`: "public" | "friends" | "private"
-- **Success Response (201 Created)**: The new post object.
+These endpoints handle the creation, deletion, and interaction with posts.
 
-### 2.2 Delete Post
-- **Endpoint**: `DELETE /posts/:postID`
-- **Auth**: Required
-- **Description**: Deletes a post owned by the user.
-- **Success Response (204 No Content)**
+### `POST /posts` (Auth Required)
+- **Description**: Creates a new post. This is a `multipart/form-data` request.
+- **Form Data**:
+  - `media`: The video file to upload.
+  - `caption`: (Optional) The caption for the post.
+  - `visibility`: (Optional) `public`, `friends`, or `private`. Defaults to `public`.
+- **Response (201 Created)**: The newly created post object.
 
-### 2.3 Repost
-- **Endpoint**: `POST /posts/:postID/repost`
-- **Auth**: Required
-- **Description**: Reposts another user's post.
-- **Success Response (201 Created)**: The new repost object.
+### `DELETE /posts/:postID` (Auth Required)
+- **Description**: Deletes a post owned by the authenticated user.
+- **Response (204 No Content)**
 
-### 2.4 Get Reposts by User
-- **Endpoint**: `GET /reposts/by-user/:userID`
-- **Auth**: Required
-- **Description**: Gets all reposts by a specific user ID.
-- **Success Response (200 OK)**: An array of post objects.
+### `POST /posts/:postID/repost` (Auth Required)
+- **Description**: Reposts an existing post.
+- **Response (201 Created)**: The new repost object.
 
-### 2.5 View Post
-- **Endpoint**: `POST /posts/:postID/view`
-- **Description**: Public endpoint to increment a post's view count.
-- **Success Response (204 No Content)**
+### `GET /reposts/by-user/:userID` (Auth Required)
+- **Description**: Retrieves all reposts made by a specific user.
+- **Response (200 OK)**: An array of post objects.
+
+### `POST /posts/:postID/view`
+- **Description**: Records a view for a post. This is a public endpoint.
+- **Response (204 No Content)**
 
 ---
 
 ## 3. Interaction Endpoints (Comments, Likes, Bookmarks)
 
-### 3.1 Add Comment
-- **Endpoint**: `POST /posts/:postID/comments`
-- **Auth**: Required
-- **Request Body**: `application/json`
+### `POST /posts/:postID/comments` (Auth Required)
+- **Description**: Adds a comment to a post.
+- **Request Body**:
   ```json
   {
-    "text": "Great content!"
+    "text": "This is a great post!"
   }
   ```
-- **Success Response (201 Created)**: The new comment object.
+- **Response (201 Created)**: The new comment object.
 
-### 3.2 Get Comments
-- **Endpoint**: `GET /posts/:postID/comments`
-- **Auth**: Required
-- **Success Response (200 OK)**: An array of comment objects.
+### `GET /posts/:postID/comments` (Auth Required)
+- **Description**: Retrieves all comments for a specific post.
+- **Response (200 OK)**: An array of comment objects.
 
-### 3.3 Like/Unlike a Post
-- **Like**: `POST /posts/:postID/like` (Auth Required)
-- **Unlike**: `DELETE /posts/:postID/like` (Auth Required)
-- **Success Response**: `204 No Content`
+### `POST /posts/:postID/like` (Auth Required)
+- **Description**: Likes a post.
+- **Response (204 No Content)**
 
-### 3.4 Bookmark/Unbookmark a Post
-- **Bookmark**: `POST /posts/:postID/bookmark` (Auth Required)
-- **Unbookmark**: `DELETE /posts/:postID/bookmark` (Auth Required)
-- **Success Response**: `204 No Content`
+### `DELETE /posts/:postID/like` (Auth Required)
+- **Description**: Removes a like from a post.
+- **Response (204 No Content)**
 
-### 3.5 Get Bookmarks
-- **Endpoint**: `GET /bookmarks`
-- **Auth**: Required
-- **Success Response (200 OK)**: An array of post objects.
+### `POST /posts/:postID/bookmark` (Auth Required)
+- **Description**: Bookmarks a post.
+- **Response (204 No Content)**
+
+### `DELETE /posts/:postID/bookmark` (Auth Required)
+- **Description**: Removes a bookmark from a post.
+- **Response (204 No Content)**
+
+### `GET /bookmarks` (Auth Required)
+- **Description**: Retrieves all posts bookmarked by the authenticated user.
+- **Response (200 OK)**: An array of post objects.
 
 ---
 
 ## 4. Social & Feed Endpoints
 
-### 4.1 Follow/Unfollow a User
-- **Follow**: `POST /users/:username/follow` (Auth Required)
-- **Unfollow**: `DELETE /users/:username/follow` (Auth Required)
-- **Success Response**: `204 No Content`
+### `POST /users/:username/follow` (Auth Required)
+- **Description**: Follows a user.
+- **Response (204 No Content)**
 
-### 4.2 Get Feeds
-- **For You Feed**: `GET /feeds/for-you` (Auth Required)
-- **Friends Feed**: `GET /feeds/friends` (Auth Required)
-- **Success Response**: An array of post objects.
+### `DELETE /users/:username/follow` (Auth Required)
+- **Description**: Unfollows a user.
+- **Response (204 No Content)**
 
-### 4.3 Get User Suggestions
-- **Endpoint**: `GET /suggestions/users`
-- **Auth**: Required
+### `GET /feeds/for-you` (Auth Required)
+- **Description**: Retrieves the "For You" feed for the authenticated user.
+- **Response (200 OK)**: An array of post objects.
+
+### `GET /feeds/friends` (Auth Required)
+- **Description**: Retrieves the "Friends" feed (mutuals) for the authenticated user.
+- **Response (200 OK)**: An array of post objects.
+
+### `GET /suggestions/users` (Auth Required)
 - **Description**: Gets a list of suggested users to follow.
-- **Success Response (200 OK)**: An array of user objects.
+- **Response (200 OK)**: An array of user objects.
 
 ---
 
 ## 5. Story Endpoints
 
-### 5.1 Create Story
-- **Endpoint**: `POST /stories`
-- **Auth**: Required
-- **Description**: Creates a new story (expires in 24h).
-- **Request Body**: `multipart/form-data`
+### `POST /stories` (Auth Required)
+- **Description**: Creates a new story. This is a `multipart/form-data` request.
+- **Form Data**:
   - `media`: The image or video file for the story.
-- **Success Response (201 Created)**: The new story object.
+- **Response (201 Created)**: The new story object.
 
-### 5.2 Get Story Feed
-- **Endpoint**: `GET /stories/feed`
-- **Auth**: Required
+### `GET /stories/feed` (Auth Required)
 - **Description**: Retrieves the story feed for the authenticated user.
-- **Success Response (200 OK)**: An array of story objects.
+- **Response (200 OK)**: An array of story objects grouped by user.
 
 ---
 
 ## 6. Notification Endpoints
 
-### 6.1 Get Notifications
-- **Endpoint**: `GET /notifications`
-- **Auth**: Required
+### `GET /notifications` (Auth Required)
 - **Description**: Retrieves notifications for the authenticated user.
-- **Success Response (200 OK)**: An array of notification objects.
+- **Response (200 OK)**: An array of notification objects.
 
-### 6.2 Mark Notifications as Read
-- **Endpoint**: `PATCH /notifications/read`
-- **Auth**: Required
+### `PATCH /notifications/read` (Auth Required)
 - **Description**: Marks specified notifications as read.
-- **Request Body**: `application/json`
+- **Request Body**:
   ```json
   {
     "notificationIds": ["id1", "id2"]
   }
   ```
-- **Success Response (204 No Content)**
+- **Response (204 No Content)**
 
 ---
 
 ## 7. Search Endpoints
 
-### 7.1 Search Users
-- **Endpoint**: `GET /search/users`
-- **Auth**: Required
+### `GET /search/users` (Auth Required)
 - **Description**: Searches for users by name or username.
-- **Query Parameters**: `?q=<search_term>`
-- **Success Response (200 OK)**: An array of user objects.
+- **Query Parameters**:
+  - `q`: The search query.
+- **Response (200 OK)**: An array of user objects.
 
 ---
 
-## 8. Wallet Endpoints
+## 8. Wallet Endpoints (Advanced)
 
-### 8.1 Export Private Key
-- **Endpoint**: `POST /wallet/export`
-- **Auth**: Required
-- **Request Body**: `application/json`
-  ```json
-  {
-    "password": "a_very_secure_password"
-  }
-  ```
-- **Success Response (200 OK)**: `{"privateKey": "encrypted-private-key-string"}`
+These endpoints are for interacting with the user's self-hosted EVM wallet.
 
-### 8.2 Personal Sign
-- **Endpoint**: `POST /wallet/personal-sign`
-- **Auth**: Required
-- **Request Body**: `application/json`
-  ```json
-  {
-    "password": "a_very_secure_password",
-    "message": "message to sign"
-  }
-  ```
-- **Success Response (200 OK)**: `{"signature": "0x..."}`
+### Wallet Flow
+1.  **Unlock Wallet**: The user must first unlock their wallet by calling `POST /wallet/unlock` with their password. This will decrypt their private key and cache it for 15 minutes.
+2.  **Perform Actions**: For the next 15 minutes, the user can call any other wallet endpoint without providing their password.
+3.  **Confirmation**: The client should confirm the transaction details with the user before broadcasting.
 
-### 8.3 Sign Transaction
-- **Endpoint**: `POST /wallet/sign-transaction`
-- **Auth**: Required
-- **Request Body**: `application/json`
-  ```json
-  {
-    "password": "a_very_secure_password",
-    "transaction": {
-      "to": "0x...",
-      "value": "10000000000000000",
-      "gas": 21000,
-      "gasPrice": "50000000000"
-    }
-  }
-  ```
-- **Success Response (200 OK)**: `{"signedTx": "0x..."}`
+### `POST /wallet/unlock` (Auth Required)
+- **Description**: Unlocks the user's wallet for the current session.
+- **Request Body**: `{"password": "user_password"}`
+- **Response (200 OK)**: `{"message": "Wallet unlocked successfully"}`
 
-### 8.4 Send Transaction
-- **Endpoint**: `POST /wallet/send-transaction`
-- **Auth**: Required
-- **Description**: Signs and broadcasts a transaction to the network.
-- **Request Body**: `application/json`
-  ```json
-  {
-    "password": "a_very_secure_password",
-    "transaction": {
-      "to": "0x...",
-      "value": "10000000000000000"
-    }
-  }
-  ```
-- **Success Response (200 OK)**: `{"txHash": "0x..."}`
+### `POST /wallet/export` (Auth Required)
+- **Description**: Exports the user's encrypted private key. This still requires a password for security.
+- **Request Body**: `{"password": "user_password"}`
+- **Response (200 OK)**: `{"privateKey": "encrypted_private_key"}`
 
-*(Other wallet endpoints like `sign-typed-data` and `secp256k1-sign` follow a similar pattern.)*
+### `POST /wallet/personal-sign` (Auth Required)
+- **Description**: Signs a message using `personal_sign`. The wallet must be unlocked.
+- **Request Body**: `{"message": "message_to_sign"}`
+- **Response (200 OK)**: `{"signature": "0x..."}`
+
+### `POST /wallet/sign-transaction` (Auth Required)
+- **Description**: Signs an Ethereum transaction. The wallet must be unlocked.
+- **Request Body**: `{"transaction": {...}}`
+- **Response (200 OK)**: `{"signedTx": "0x..."}`
+
+### `POST /wallet/send-transaction` (Auth Required)
+- **Description**: Signs and sends an Ethereum transaction. The wallet must be unlocked.
+- **Request Body**: `{"transaction": {...}}`
+- **Response (200 OK)**: `{"transactionHash": "0x..."}`
+
+### `POST /wallet/sign-typed-data` (Auth Required)
+- **Description**: Signs typed data according to EIP-712. The wallet must be unlocked.
+- **Request Body**: `{"typedData": {...}}`
+- **Response (200 OK)**: `{"signature": "0x..."}`
+
+### `POST /wallet/secp256k1-sign` (Auth Required)
+- **Description**: Signs a hash using the user's private key with the secp256k1 algorithm. The wallet must be unlocked.
+- **Request Body**: `{"hash": "message_hash"}`
+- **Response (200 OK)**: `{"signature": "0x..."}`

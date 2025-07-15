@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Copy go.mod and go.sum files to download dependencies
 COPY go.mod go.sum ./
-RUN go mod download
+RUN go mod download && go mod verify
 
 # Copy the rest of the application source code
 COPY . .

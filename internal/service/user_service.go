@@ -35,18 +35,25 @@ type UserProfileResponse struct {
 	FriendshipStatus string `json:"friendshipStatus"`
 }
 
+type LoginResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
 // UserService defines the interface for user business logic.
 type UserService interface {
 	Register(ctx context.Context, name, email, password string) error
-	Login(ctx context.Context, email, password string) (string, error)
+	Login(ctx context.Context, email, password, userAgent, clientIP string) (*LoginResponse, error)
+	RefreshToken(ctx context.Context, refreshToken string) (*LoginResponse, error)
+	UnlockWallet(ctx context.Context, userID, password string) error
 	GetUserProfile(ctx context.Context, viewerID, username string) (*UserProfileResponse, error)
 	UpdateProfile(ctx context.Context, userID string, payload UpdateProfilePayload) (*domain.User, error)
 	ExportPrivateKey(ctx context.Context, userID, password string) (string, error)
-	PersonalSign(ctx context.Context, userID, password, message string) (string, error)
-	SignTransaction(ctx context.Context, userID, password string, tx *types.Transaction) (*types.Transaction, error)
-	SendTransaction(ctx context.Context, userID, password string, tx *types.Transaction) (common.Hash, error)
-	SignTypedDataV4(ctx context.Context, userID, password string, typedData apitypes.TypedData) (string, error)
-	Secp256k1Sign(ctx context.Context, userID, password, hash string) (string, error)
+	PersonalSign(ctx context.Context, userID, message string) (string, error)
+	SignTransaction(ctx context.Context, userID string, tx *types.Transaction) (*types.Transaction, error)
+	SendTransaction(ctx context.Context, userID string, tx *types.Transaction) (common.Hash, error)
+	SignTypedDataV4(ctx context.Context, userID string, typedData apitypes.TypedData) (string, error)
+	Secp256k1Sign(ctx context.Context, userID, hash string) (string, error)
 	RequestOTP(ctx context.Context, email string) error
 	VerifyOTPAndResetPassword(ctx context.Context, email, otp, newPassword string) error
 }
@@ -55,21 +62,25 @@ type userService struct {
 	userRepo            repository.UserRepository
 	followRepo          repository.FollowRepository
 	counterRepo         repository.CounterRepository
+	sessionRepo         *repository.SessionRepository
 	walletService       WalletService
 	emailService        EmailService
+	sessionService      *SessionService
 	cache               cache.Client
 	jwtSecret           string
 	walletEncryptionKey string
 }
 
 // NewUserService creates a new user service.
-func NewUserService(userRepo repository.UserRepository, followRepo repository.FollowRepository, counterRepo repository.CounterRepository, walletService WalletService, emailService EmailService, cache cache.Client, jwtSecret, walletEncryptionKey string) UserService {
+func NewUserService(userRepo repository.UserRepository, followRepo repository.FollowRepository, counterRepo repository.CounterRepository, sessionRepo *repository.SessionRepository, walletService WalletService, emailService EmailService, sessionService *SessionService, cache cache.Client, jwtSecret, walletEncryptionKey string) UserService {
 	return &userService{
 		userRepo:            userRepo,
 		followRepo:          followRepo,
 		counterRepo:         counterRepo,
+		sessionRepo:         sessionRepo,
 		walletService:       walletService,
 		emailService:        emailService,
+		sessionService:      sessionService,
 		cache:               cache,
 		jwtSecret:           jwtSecret,
 		walletEncryptionKey: walletEncryptionKey,
@@ -108,27 +119,97 @@ func (s *userService) Register(ctx context.Context, name, email, password string
 	}
 	return s.userRepo.Create(ctx, user)
 }
-func (s *userService) Login(ctx context.Context, email, password string) (string, error) {
+func (s *userService) Login(ctx context.Context, email, password, userAgent, clientIP string) (*LoginResponse, error) {
 	user, err := s.userRepo.FindByEmail(ctx, email)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if user == nil {
-		return "", errors.New("invalid credentials")
+		return nil, errors.New("invalid credentials")
 	}
 	if !utils.CheckPasswordHash(password, user.Password) {
-		return "", errors.New("invalid credentials")
+		return nil, errors.New("invalid credentials")
 	}
+
+	refreshToken, err := utils.GenerateRandomString(32)
+	if err != nil {
+		return nil, err
+	}
+
+	session, err := s.sessionService.Create(ctx, user.ID, refreshToken, userAgent, clientIP)
+	if err != nil {
+		return nil, err
+	}
+
 	claims := jwt.MapClaims{
 		"sub": user.ID.Hex(),
-		"exp": time.Now().Add(time.Hour * 72).Unix(),
+		"sid": session.ID.Hex(),
+		"exp": time.Now().Add(time.Hour * 24).Unix(), // Access token expires in 24 hours
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte(s.jwtSecret))
+	accessToken, err := token.SignedString([]byte(s.jwtSecret))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return tokenString, nil
+	return &LoginResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, nil
+}
+
+func (s *userService) RefreshToken(ctx context.Context, refreshToken string) (*LoginResponse, error) {
+	session, err := s.sessionRepo.FindByRefreshToken(ctx, refreshToken)
+	if err != nil {
+		return nil, err
+	}
+
+	if session.IsBlocked || time.Now().After(session.ExpiresAt) {
+		return nil, errors.New("invalid or expired refresh token")
+	}
+
+	user, err := s.userRepo.FindByID(ctx, session.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	claims := jwt.MapClaims{
+		"sub": user.ID.Hex(),
+		"sid": session.ID.Hex(),
+		"exp": time.Now().Add(time.Hour * 24).Unix(), // Access token expires in 24 hours
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	accessToken, err := token.SignedString([]byte(s.jwtSecret))
+	if err != nil {
+		return nil, err
+	}
+
+	return &LoginResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, nil
+}
+
+func (s *userService) UnlockWallet(ctx context.Context, userIDStr, password string) error {
+	userID, err := primitive.ObjectIDFromHex(userIDStr)
+	if err != nil {
+		return errors.New("invalid user ID format")
+	}
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return errors.New("user not found")
+	}
+	if !utils.CheckPasswordHash(password, user.Password) {
+		return errors.New("invalid password")
+	}
+	decryptedKey, err := utils.Decrypt(user.EncryptedPrivateKey, s.walletEncryptionKey)
+	if err != nil {
+		return errors.New("could not decrypt private key")
+	}
+	cacheKey := fmt.Sprintf("wallet:%s", userIDStr)
+	return s.cache.Set(ctx, cacheKey, decryptedKey, 15*time.Minute)
 }
 
 // GetUserProfile retrieves a user's public profile and friendship status, with caching.
@@ -263,10 +344,11 @@ func (s *userService) ExportPrivateKey(ctx context.Context, userIDStr, password 
 	}
 	return decryptedKey, nil
 }
-func (s *userService) PersonalSign(ctx context.Context, userIDStr, password, message string) (string, error) {
-	decryptedKey, err := s.ExportPrivateKey(ctx, userIDStr, password)
+func (s *userService) PersonalSign(ctx context.Context, userIDStr, message string) (string, error) {
+	cacheKey := fmt.Sprintf("wallet:%s", userIDStr)
+	decryptedKey, err := s.cache.Get(ctx, cacheKey)
 	if err != nil {
-		return "", err
+		return "", errors.New("wallet is locked")
 	}
 	signer, err := evm.NewSignerFromHex(decryptedKey)
 	if err != nil {
@@ -274,10 +356,11 @@ func (s *userService) PersonalSign(ctx context.Context, userIDStr, password, mes
 	}
 	return signer.PersonalSign([]byte(message))
 }
-func (s *userService) SignTransaction(ctx context.Context, userIDStr, password string, tx *types.Transaction) (*types.Transaction, error) {
-	decryptedKey, err := s.ExportPrivateKey(ctx, userIDStr, password)
+func (s *userService) SignTransaction(ctx context.Context, userIDStr string, tx *types.Transaction) (*types.Transaction, error) {
+	cacheKey := fmt.Sprintf("wallet:%s", userIDStr)
+	decryptedKey, err := s.cache.Get(ctx, cacheKey)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("wallet is locked")
 	}
 	signer, err := evm.NewSignerFromHex(decryptedKey)
 	if err != nil {
@@ -285,10 +368,11 @@ func (s *userService) SignTransaction(ctx context.Context, userIDStr, password s
 	}
 	return signer.SignTransaction(tx)
 }
-func (s *userService) SignTypedDataV4(ctx context.Context, userIDStr, password string, typedData apitypes.TypedData) (string, error) {
-	decryptedKey, err := s.ExportPrivateKey(ctx, userIDStr, password)
+func (s *userService) SignTypedDataV4(ctx context.Context, userIDStr string, typedData apitypes.TypedData) (string, error) {
+	cacheKey := fmt.Sprintf("wallet:%s", userIDStr)
+	decryptedKey, err := s.cache.Get(ctx, cacheKey)
 	if err != nil {
-		return "", err
+		return "", errors.New("wallet is locked")
 	}
 	signer, err := evm.NewSignerFromHex(decryptedKey)
 	if err != nil {
@@ -296,17 +380,19 @@ func (s *userService) SignTypedDataV4(ctx context.Context, userIDStr, password s
 	}
 	return signer.SignTypedDataV4(typedData)
 }
-func (s *userService) SendTransaction(ctx context.Context, userIDStr, password string, tx *types.Transaction) (common.Hash, error) {
-	decryptedKey, err := s.ExportPrivateKey(ctx, userIDStr, password)
+func (s *userService) SendTransaction(ctx context.Context, userIDStr string, tx *types.Transaction) (common.Hash, error) {
+	cacheKey := fmt.Sprintf("wallet:%s", userIDStr)
+	decryptedKey, err := s.cache.Get(ctx, cacheKey)
 	if err != nil {
-		return common.Hash{}, err
+		return common.Hash{}, errors.New("wallet is locked")
 	}
 	return s.walletService.SendTransaction(ctx, tx, decryptedKey)
 }
-func (s *userService) Secp256k1Sign(ctx context.Context, userIDStr, password, hashStr string) (string, error) {
-	decryptedKey, err := s.ExportPrivateKey(ctx, userIDStr, password)
+func (s *userService) Secp256k1Sign(ctx context.Context, userIDStr, hashStr string) (string, error) {
+	cacheKey := fmt.Sprintf("wallet:%s", userIDStr)
+	decryptedKey, err := s.cache.Get(ctx, cacheKey)
 	if err != nil {
-		return "", err
+		return "", errors.New("wallet is locked")
 	}
 	signer, err := evm.NewSignerFromHex(decryptedKey)
 	if err != nil {

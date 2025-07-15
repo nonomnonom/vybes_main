@@ -50,13 +50,51 @@ func (h *UserHandler) Login(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	token, err := h.userService.Login(c.Request.Context(), request.Email, request.Password)
+	response, err := h.userService.Login(c.Request.Context(), request.Email, request.Password, c.Request.UserAgent(), c.ClientIP())
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"token": token})
+	c.JSON(http.StatusOK, response)
 }
+
+func (h *UserHandler) RefreshToken(c *gin.Context) {
+	var request struct {
+		RefreshToken string `json:"refresh_token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	response, err := h.userService.RefreshToken(c.Request.Context(), request.RefreshToken)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
+		return
+	}
+	c.JSON(http.StatusOK, response)
+}
+
+func (h *UserHandler) UnlockWallet(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in token"})
+		return
+	}
+	var request struct {
+		Password string `json:"password" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	err := h.userService.UnlockWallet(c.Request.Context(), userID.(string), request.Password)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Wallet unlocked successfully"})
+}
+
 func (h *UserHandler) GetUserProfile(c *gin.Context) {
 	viewerID, exists := c.Get("userID")
 	if !exists {
@@ -116,14 +154,13 @@ func (h *UserHandler) PersonalSign(c *gin.Context) {
 		return
 	}
 	var request struct {
-		Password string `json:"password" binding:"required"`
-		Message  string `json:"message" binding:"required"`
+		Message string `json:"message" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	signature, err := h.userService.PersonalSign(c.Request.Context(), userID.(string), request.Password, request.Message)
+	signature, err := h.userService.PersonalSign(c.Request.Context(), userID.(string), request.Message)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -137,7 +174,6 @@ func (h *UserHandler) SignTransaction(c *gin.Context) {
 		return
 	}
 	var request struct {
-		Password    string          `json:"password" binding:"required"`
 		Transaction json.RawMessage `json:"transaction" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -149,7 +185,7 @@ func (h *UserHandler) SignTransaction(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid transaction format"})
 		return
 	}
-	signedTx, err := h.userService.SignTransaction(c.Request.Context(), userID.(string), request.Password, &tx)
+	signedTx, err := h.userService.SignTransaction(c.Request.Context(), userID.(string), &tx)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -163,14 +199,13 @@ func (h *UserHandler) SignTypedDataV4(c *gin.Context) {
 		return
 	}
 	var request struct {
-		Password  string            `json:"password" binding:"required"`
 		TypedData apitypes.TypedData `json:"typedData" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	signature, err := h.userService.SignTypedDataV4(c.Request.Context(), userID.(string), request.Password, request.TypedData)
+	signature, err := h.userService.SignTypedDataV4(c.Request.Context(), userID.(string), request.TypedData)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -184,7 +219,6 @@ func (h *UserHandler) SendTransaction(c *gin.Context) {
 		return
 	}
 	var request struct {
-		Password    string          `json:"password" binding:"required"`
 		Transaction json.RawMessage `json:"transaction" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -196,7 +230,7 @@ func (h *UserHandler) SendTransaction(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid transaction format"})
 		return
 	}
-	txHash, err := h.userService.SendTransaction(c.Request.Context(), userID.(string), request.Password, &tx)
+	txHash, err := h.userService.SendTransaction(c.Request.Context(), userID.(string), &tx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -210,14 +244,13 @@ func (h *UserHandler) Secp256k1Sign(c *gin.Context) {
 		return
 	}
 	var request struct {
-		Password string `json:"password" binding:"required"`
-		Hash     string `json:"hash" binding:"required"`
+		Hash string `json:"hash" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	signature, err := h.userService.Secp256k1Sign(c.Request.Context(), userID.(string), request.Password, request.Hash)
+	signature, err := h.userService.Secp256k1Sign(c.Request.Context(), userID.(string), request.Hash)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return

@@ -9,7 +9,7 @@ DOCKER_TAG=latest
 # Default target executed when 'make' is run without arguments
 .DEFAULT_GOAL := help
 
-.PHONY: all build run test docker-build docker-up docker-down docker-logs help
+.PHONY: all build run test backtest docker-build docker-up docker-down docker-logs help
 
 ## build: Compile the application
 build:
@@ -25,6 +25,11 @@ run: build
 test:
 	@echo "Running tests..."
 	@go test ./...
+
+## backtest: Run a load test on the API
+backtest:
+	@echo "Running backtest..."
+	@bash test/backtest.sh
 
 ## docker-build: Build the Docker image for the API
 docker-build:
@@ -54,6 +59,7 @@ help:
 	@echo "  build          Compile the application"
 	@echo "  run            Run the application locally"
 	@echo "  test           Run all tests"
+	@echo "  backtest       Run a load test on the API"
 	@echo "  docker-build   Build the Docker image for the API"
 	@echo "  docker-up      Start all services using Docker Compose"
 	@echo "  docker-down    Stop all services started with Docker Compose"

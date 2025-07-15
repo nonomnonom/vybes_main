@@ -4,13 +4,15 @@ import (
 	"net/http"
 	"strings"
 	"vybes/internal/config"
+	"vybes/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // AuthMiddleware creates a Gin middleware for JWT authentication.
-func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
+func AuthMiddleware(cfg *config.Config, sessionService *service.SessionService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -45,6 +47,24 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		userID, ok := claims["sub"].(string)
 		if !ok {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID in token"})
+			return
+		}
+
+		sessionIDHex, ok := claims["sid"].(string)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid session ID in token"})
+			return
+		}
+
+		sessionID, err := primitive.ObjectIDFromHex(sessionIDHex)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid session ID format"})
+			return
+		}
+
+		session, err := sessionService.GetByID(c.Request.Context(), sessionID)
+		if err != nil || session.IsBlocked {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or blocked session"})
 			return
 		}
 
