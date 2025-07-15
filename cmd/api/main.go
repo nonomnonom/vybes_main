@@ -21,48 +21,51 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+// main initializes and starts the Vybes API server.
+// It sets up all necessary components including database connections,
+// services, handlers, and background workers.
 func main() {
-	// Setup structured logging
+	// Initialize structured logging with console output for development
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	// Load configuration
+	// Load application configuration from environment variables
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to load config")
+		log.Fatal().Err(err).Msg("Failed to load configuration")
 	}
 
-	// Connect to MongoDB
+	// Establish connection to MongoDB database
 	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(cfg.MongoURI))
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to connect to MongoDB")
+		log.Fatal().Err(err).Msg("Failed to establish MongoDB connection")
 	}
 	defer client.Disconnect(context.Background())
 
 	db := client.Database(cfg.DBName)
 	log.Info().Str("database", db.Name()).Msg("Successfully connected to MongoDB")
 
-	// Setup database indexes
+	// Create database indexes for optimal query performance
 	repository.SetupIndexes(context.Background(), db)
 
-	// Initialize storage client
+	// Initialize cloud storage client for file uploads
 	storageClient, err := storage.NewClient(context.Background(), cfg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to initialize storage client")
 	}
 
-	// Initialize cache client
+	// Initialize Redis cache client for session and data caching
 	cacheClient, err := cache.NewClient(cfg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to initialize cache client")
 	}
 
-	// Initialize NATS Notification Publisher
+	// Initialize NATS message broker for real-time notifications
 	notificationPublisher, err := service.NewNATSNotificationPublisher(cfg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to initialize NATS notification publisher")
 	}
 
-	// Initialize repositories
+	// Initialize all data access layer repositories
 	userRepository := repository.NewMongoUserRepository(db)
 	followRepository := repository.NewMongoFollowRepository(db)
 	counterRepository := repository.NewMongoCounterRepository(db)
@@ -73,7 +76,7 @@ func main() {
 	notificationRepository := repository.NewMongoNotificationRepository(db)
 	sessionRepository := repository.NewSessionRepository(db)
 
-	// Initialize services
+	// Initialize all business logic services with their dependencies
 	emailService := service.NewResendEmailService(cfg)
 	walletService := service.NewWalletService(cfg)
 	notificationService := service.NewNotificationService(notificationRepository)
@@ -89,13 +92,13 @@ func main() {
 	searchService := service.NewSearchService(userRepository)
 	cronService := service.NewCronService(cfg, storyRepository, storageClient)
 
-	// Start NATS worker in the background
+	// Start background NATS worker for processing notification events
 	go startNATSWorker(cfg, notificationService)
 
-	// Start cron jobs in the background
+	// Start background cron jobs for scheduled tasks (e.g., story cleanup)
 	go cronService.Start()
 
-	// Initialize handlers
+	// Initialize all HTTP handlers with their corresponding services
 	userHandler := httphandler.NewUserHandler(userService)
 	followHandler := httphandler.NewFollowHandler(followService)
 	suggestionHandler := httphandler.NewSuggestionHandler(suggestionService)
@@ -108,31 +111,40 @@ func main() {
 	notificationHandler := httphandler.NewNotificationHandler(notificationService)
 	sessionHandler := httphandler.NewSessionHandler(sessionService)
 
-	// Setup router
+	// Configure HTTP router with all endpoints and middleware
 	router := httphandler.SetupRouter(userHandler, followHandler, suggestionHandler, storyHandler, contentHandler, reactionHandler, feedHandler, bookmarkHandler, searchHandler, notificationHandler, sessionHandler, sessionService, cfg)
 
-	// Setup robust HTTP server
+	// Configure HTTP server with appropriate timeouts and settings
 	server := &http.Server{
 		Addr:         cfg.Port,
 		Handler:      router,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  15 * time.Second,
+		ReadTimeout:  5 * time.Second,  // Timeout for reading request body
+		WriteTimeout: 10 * time.Second, // Timeout for writing response
+		IdleTimeout:  15 * time.Second, // Timeout for idle connections
 	}
 
-	// Start server
-	log.Info().Str("port", cfg.Port).Msg("Server starting")
+	// Start the HTTP server and begin accepting requests
+	log.Info().Str("port", cfg.Port).Msg("Starting Vybes API server")
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatal().Err(err).Msg("Failed to start server")
+		log.Fatal().Err(err).Msg("Server failed to start")
 	}
 }
 
+// startNATSWorker initializes and starts a NATS worker for processing
+// notification events asynchronously. It subscribes to the notification
+// subject and processes incoming messages.
+//
+// Parameters:
+//   - cfg: Application configuration containing NATS connection details
+//   - notificationService: Service for creating notifications
 func startNATSWorker(cfg *config.Config, notificationService service.NotificationService) {
+	// Connect to NATS message broker
 	nc, err := nats.Connect(cfg.NatsURL)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to connect to NATS for worker")
 	}
 
+	// Subscribe to notification events and process them
 	_, err = nc.Subscribe(service.NotificationSubject, func(m *nats.Msg) {
 		var event domain.Notification
 		if err := json.Unmarshal(m.Data, &event); err != nil {
@@ -140,14 +152,16 @@ func startNATSWorker(cfg *config.Config, notificationService service.Notificatio
 			return
 		}
 
+		// Log the received notification event for debugging
 		log.Info().
 			Str("recipient_id", event.UserID.Hex()).
 			Str("actor_id", event.ActorID.Hex()).
 			Str("type", string(event.Type)).
 			Msg("Received notification event from NATS")
 
+		// Create notification in database using the event data
 		// The original CreateNotification service method expected metadata as the last argument.
-		// Now we pass the specific PostID from the event.
+		// Now we pass the specific PostID from the event for better context.
 		if err := notificationService.CreateNotification(context.Background(), event.UserID, event.ActorID, event.Type, event.PostID); err != nil {
 			log.Error().Err(err).Msg("Failed to create notification from NATS event")
 		}
@@ -158,6 +172,6 @@ func startNATSWorker(cfg *config.Config, notificationService service.Notificatio
 	}
 
 	log.Info().Str("subject", service.NotificationSubject).Msg("NATS worker subscribed and listening")
-	// Keep the worker running
+	// Keep the worker running indefinitely to process events
 	select {}
 }

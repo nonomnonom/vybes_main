@@ -8,66 +8,41 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // StoryRepository defines the interface for story data operations.
+// Stories are temporary content that expire after 24 hours and are
+// only visible to users who follow the story creator.
 type StoryRepository interface {
-	Create(ctx context.Context, story *domain.Story) error
-	GetStoriesByUsers(ctx context.Context, userIDs []primitive.ObjectID) ([]domain.Story, error)
-	FindExpired(ctx context.Context) ([]domain.Story, error)
-	DeleteMany(ctx context.Context, storyIDs []primitive.ObjectID) error
+	// CreateStory creates a new story in the database
+	CreateStory(ctx context.Context, story *domain.Story) error
+	// GetStoriesByUserID retrieves all active stories for a specific user
+	GetStoriesByUserID(ctx context.Context, userID primitive.ObjectID) ([]domain.Story, error)
+	// GetStoriesForFeed retrieves stories from followed users for the feed
+	GetStoriesForFeed(ctx context.Context, userID primitive.ObjectID) ([]domain.Story, error)
+	// DeleteStory removes a story from the database
+	DeleteStory(ctx context.Context, storyID, userID primitive.ObjectID) error
+	// DeleteExpiredStories removes all stories that have expired (older than 24 hours)
+	DeleteExpiredStories(ctx context.Context) error
 }
 
+// mongoStoryRepository implements StoryRepository using MongoDB as the backend
 type mongoStoryRepository struct {
-	db         *mongo.Database
-	collection string
+	collection *mongo.Collection
 }
 
-// NewMongoStoryRepository creates a new story repository with MongoDB.
+// NewMongoStoryRepository creates a new story repository instance with MongoDB backend.
+// The repository handles all story-related database operations including CRUD operations
+// and automatic cleanup of expired stories.
+//
+// Parameters:
+//   - db: MongoDB database instance
+//
+// Returns:
+//   - StoryRepository: A configured story repository ready for use
 func NewMongoStoryRepository(db *mongo.Database) StoryRepository {
 	return &mongoStoryRepository{
-		db:         db,
-		collection: "stories",
+		collection: db.Collection("stories"),
 	}
-}
-
-func (r *mongoStoryRepository) Create(ctx context.Context, story *domain.Story) error {
-	_, err := r.db.Collection(r.collection).InsertOne(ctx, story)
-	return err
-}
-
-func (r *mongoStoryRepository) GetStoriesByUsers(ctx context.Context, userIDs []primitive.ObjectID) ([]domain.Story, error) {
-	filter := bson.M{"userid": bson.M{"$in": userIDs}}
-	cursor, err := r.db.Collection(r.collection).Find(ctx, filter)
-	if err != nil {
-		return nil, err
-	}
-	defer cursor.Close(ctx)
-
-	var stories []domain.Story
-	if err = cursor.All(ctx, &stories); err != nil {
-		return nil, err
-	}
-	return stories, nil
-}
-
-func (r *mongoStoryRepository) FindExpired(ctx context.Context) ([]domain.Story, error) {
-	filter := bson.M{"expiresat": bson.M{"$lte": time.Now()}}
-	cursor, err := r.db.Collection(r.collection).Find(ctx, filter)
-	if err != nil {
-		return nil, err
-	}
-	defer cursor.Close(ctx)
-
-	var stories []domain.Story
-	if err = cursor.All(ctx, &stories); err != nil {
-		return nil, err
-	}
-	return stories, nil
-}
-
-func (r *mongoStoryRepository) DeleteMany(ctx context.Context, storyIDs []primitive.ObjectID) error {
-	filter := bson.M{"_id": bson.M{"$in": storyIDs}}
-	_, err := r.db.Collection(r.collection).DeleteMany(ctx, filter)
-	return err
 }
