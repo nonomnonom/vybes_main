@@ -50,7 +50,7 @@ type UserService interface {
 	Login(ctx context.Context, email, password, userAgent, clientIP string) (*LoginResponse, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*LoginResponse, error)
 	UnlockWallet(ctx context.Context, userID, password string) error
-	GetUserProfile(ctx context.Context, viewerID, vid *int64, username *string) (*UserProfileResponse, error)
+	GetUserProfile(ctx context.Context, viewerID string, vid *int64, username *string) (*UserProfileResponse, error)
 	UpdateProfile(ctx context.Context, userID string, payload UpdateProfilePayload) (*domain.User, error)
 	ExportPrivateKey(ctx context.Context, userID, password string) (string, error)
 	PersonalSign(ctx context.Context, userID, message string) (string, error)
