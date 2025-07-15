@@ -31,6 +31,10 @@ func SetupRouter(
 	// API v1 routes
 	apiV1 := router.Group("/api/v1")
 	{
+		// Serve static files from the 'public' directory
+		// e.g., /api/v1/llm.txt will serve the public/llm.txt file
+		apiV1.StaticFS("/public", gin.Dir("./public", false))
+
 		// Public routes
 		publicUserRoutes := apiV1.Group("/users")
 		{
@@ -54,7 +58,6 @@ func SetupRouter(
 
 			// User profile and wallet routes
 			authRoutes.GET("/users/:username", userHandler.GetUserProfile)
-			authRoutes.GET("/users/:userID/reposts", contentHandler.GetRepostsByUser)
 			authRoutes.PATCH("/users/me", userHandler.UpdateProfile)
 			authRoutes.POST("/wallet/export", userHandler.ExportPrivateKey)
 			authRoutes.POST("/wallet/personal-sign", userHandler.PersonalSign)
@@ -78,6 +81,7 @@ func SetupRouter(
 			posts := authRoutes.Group("/posts")
 			{
 				posts.POST("/", contentHandler.CreatePost)
+				posts.DELETE("/:postID", contentHandler.DeletePost)
 				posts.POST("/:postID/repost", contentHandler.Repost)
 				posts.GET("/:postID/comments", contentHandler.GetComments)
 				posts.POST("/:postID/comments", contentHandler.CreateComment)
@@ -86,6 +90,9 @@ func SetupRouter(
 				posts.POST("/:postID/bookmark", bookmarkHandler.AddBookmark)
 				posts.DELETE("/:postID/bookmark", bookmarkHandler.RemoveBookmark)
 			}
+			
+			// Repost-specific routes
+			authRoutes.GET("/reposts/by-user/:userID", contentHandler.GetRepostsByUser)
 
 			// Feed and Bookmark routes
 			authRoutes.GET("/feeds/for-you", feedHandler.GetForYouFeed)

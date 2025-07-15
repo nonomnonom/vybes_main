@@ -12,7 +12,6 @@ import (
 	"vybes/internal/repository"
 	"vybes/internal/service"
 	"vybes/pkg/cache"
-	"vybes/pkg/media"
 	"vybes/pkg/storage"
 
 	"github.com/nats-io/nats.go"
@@ -57,12 +56,6 @@ func main() {
 		log.Fatal().Err(err).Msg("Failed to initialize cache client")
 	}
 
-	// Initialize media processor
-	mediaProcessor, err := media.NewFFmpegProcessor()
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to initialize media processor")
-	}
-
 	// Initialize NATS Notification Publisher
 	notificationPublisher, err := service.NewNATSNotificationPublisher(cfg)
 	if err != nil {
@@ -87,7 +80,7 @@ func main() {
 	followService := service.NewFollowService(followRepository, userRepository, notificationPublisher)
 	suggestionService := service.NewSuggestionService(userRepository, followRepository)
 	storyService := service.NewStoryService(storyRepository, followRepository, storageClient, cfg)
-	contentService := service.NewContentService(contentRepository, userRepository, storageClient, notificationPublisher, mediaProcessor, cfg)
+	contentService := service.NewContentService(contentRepository, userRepository, storageClient, notificationPublisher, cfg)
 	reactionService := service.NewReactionService(reactionRepository, contentRepository, userRepository, notificationPublisher)
 	feedService := service.NewFeedService(contentRepository, followRepository)
 	bookmarkService := service.NewBookmarkService(bookmarkRepository, contentRepository)

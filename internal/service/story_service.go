@@ -55,7 +55,7 @@ func (s *storyService) CreateStory(ctx context.Context, userIDStr string, fileHe
 	contentType := fileHeader.Header.Get("Content-Type")
 
 	// Upload to MinIO
-	uploadInfo, err := s.storage.UploadFile(ctx, s.cfg.MinioBucketName, objectName, file, fileHeader.Size, contentType)
+	uploadInfo, err := s.storage.UploadFile(ctx, s.cfg.MinioStoriesBucket, objectName, file, fileHeader.Size, contentType)
 	if err != nil {
 		return nil, err
 	}

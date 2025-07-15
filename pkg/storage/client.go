@@ -20,7 +20,7 @@ type minioStorageClient struct {
 	client *minio.Client
 }
 
-// NewClient creates a new MinIO client and ensures the bucket exists.
+// NewClient creates a new MinIO client and ensures the required buckets exist.
 func NewClient(ctx context.Context, cfg *config.Config) (Client, error) {
 	client, err := minio.New(cfg.MinioEndpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.MinioAccessKey, cfg.MinioSecretKey, ""),
@@ -30,21 +30,31 @@ func NewClient(ctx context.Context, cfg *config.Config) (Client, error) {
 		return nil, err
 	}
 
-	// Check if the bucket already exists.
-	exists, err := client.BucketExists(ctx, cfg.MinioBucketName)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		// Create the bucket if it does not exist.
-		err = client.MakeBucket(ctx, cfg.MinioBucketName, minio.MakeBucketOptions{})
-		if err != nil {
+	// Ensure all required buckets exist
+	buckets := []string{cfg.MinioPostsBucket, cfg.MinioStoriesBucket}
+	for _, bucket := range buckets {
+		if err := ensureBucketExists(ctx, client, bucket); err != nil {
 			return nil, err
 		}
-		log.Info().Str("bucket", cfg.MinioBucketName).Msg("Successfully created bucket")
 	}
 
 	return &minioStorageClient{client: client}, nil
+}
+
+// ensureBucketExists checks if a bucket exists and creates it if it doesn't.
+func ensureBucketExists(ctx context.Context, client *minio.Client, bucketName string) error {
+	exists, err := client.BucketExists(ctx, bucketName)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		err = client.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
+		if err != nil {
+			return err
+		}
+		log.Info().Str("bucket", bucketName).Msg("Successfully created bucket")
+	}
+	return nil
 }
 
 // UploadFile uploads a file to the specified bucket.

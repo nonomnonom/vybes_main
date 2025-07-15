@@ -13,9 +13,12 @@ import (
 // ContentRepository defines the interface for content and post data operations.
 type ContentRepository interface {
 	CreateContent(ctx context.Context, content *domain.Content) error
+	GetContentByID(ctx context.Context, contentID primitive.ObjectID) (*domain.Content, error)
+	DeleteContent(ctx context.Context, contentID primitive.ObjectID) error
 	CreatePost(ctx context.Context, post *domain.Post) error
 	GetPostByID(ctx context.Context, postID primitive.ObjectID) (*domain.Post, error)
 	GetPostsByIDs(ctx context.Context, postIDs []primitive.ObjectID) ([]domain.Post, error)
+	DeletePost(ctx context.Context, postID primitive.ObjectID) error
 	GetPostsByUsersWithVisibility(ctx context.Context, userIDs []primitive.ObjectID, visibilities []domain.PostVisibility, limit int) ([]domain.Post, error)
 	GetRepostsByUser(ctx context.Context, userID primitive.ObjectID, limit int) ([]domain.Post, error)
 	CreateComment(ctx context.Context, comment *domain.Comment) error
@@ -51,6 +54,20 @@ func (r *mongoContentRepository) CreateContent(ctx context.Context, content *dom
 	return err
 }
 
+func (r *mongoContentRepository) GetContentByID(ctx context.Context, contentID primitive.ObjectID) (*domain.Content, error) {
+	var content domain.Content
+	err := r.content().FindOne(ctx, bson.M{"_id": contentID}).Decode(&content)
+	if err != nil {
+		return nil, err
+	}
+	return &content, nil
+}
+
+func (r *mongoContentRepository) DeleteContent(ctx context.Context, contentID primitive.ObjectID) error {
+	_, err := r.content().DeleteOne(ctx, bson.M{"_id": contentID})
+	return err
+}
+
 func (r *mongoContentRepository) CreatePost(ctx context.Context, post *domain.Post) error {
 	_, err := r.posts().InsertOne(ctx, post)
 	return err
@@ -78,6 +95,11 @@ func (r *mongoContentRepository) GetPostsByIDs(ctx context.Context, postIDs []pr
 		return nil, err
 	}
 	return posts, nil
+}
+
+func (r *mongoContentRepository) DeletePost(ctx context.Context, postID primitive.ObjectID) error {
+	_, err := r.posts().DeleteOne(ctx, bson.M{"_id": postID})
+	return err
 }
 
 func (r *mongoContentRepository) GetPostsByUsersWithVisibility(ctx context.Context, userIDs []primitive.ObjectID, visibilities []domain.PostVisibility, limit int) ([]domain.Post, error) {

@@ -51,6 +51,19 @@ func (h *ContentHandler) CreatePost(c *gin.Context) {
 	c.JSON(http.StatusCreated, post)
 }
 
+// DeletePost is the handler for deleting a post.
+func (h *ContentHandler) DeletePost(c *gin.Context) {
+	userID, _ := c.Get("userID")
+	postID := c.Param("postID")
+
+	if err := h.contentService.DeletePost(c.Request.Context(), userID.(string), postID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
 // Repost is the handler for reposting another post.
 func (h *ContentHandler) Repost(c *gin.Context) {
 	userID, _ := c.Get("userID")

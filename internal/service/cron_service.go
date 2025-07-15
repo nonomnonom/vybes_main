@@ -60,16 +60,17 @@ func (s *CronService) cleanupExpiredStories() {
 	for _, story := range expiredStories {
 		storyIDsToDelete = append(storyIDsToDelete, story.ID)
 		// Extract object name from URL
-		parts := strings.Split(story.MediaURL, "/")
-		if len(parts) > 2 {
-			objectName := strings.Join(parts[len(parts)-2:], "/")
+		// This logic is brittle. A better way is to store the object name directly in the story document.
+		// For now, we'll stick with this.
+		objectName := strings.TrimPrefix(story.MediaURL, s.cfg.MinioEndpoint+"/"+s.cfg.MinioStoriesBucket+"/")
+		if objectName != story.MediaURL { // Ensure prefix was actually trimmed
 			objectsToDelete = append(objectsToDelete, objectName)
 		}
 	}
 
 	// Delete files from MinIO
 	for _, objectName := range objectsToDelete {
-		err := s.storage.DeleteFile(ctx, s.cfg.MinioBucketName, objectName)
+		err := s.storage.DeleteFile(ctx, s.cfg.MinioStoriesBucket, objectName)
 		if err != nil {
 			log.Error().Err(err).Str("object", objectName).Msg("Failed to delete story media from storage")
 			// We continue even if one fails, to attempt deleting others.

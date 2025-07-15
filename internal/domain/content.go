@@ -16,11 +16,10 @@ const (
 
 // Content represents a piece of media content.
 type Content struct {
-	ID           primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
-	UserID       primitive.ObjectID `bson:"userId" json:"userId"`
-	Type         ContentType        `bson:"type" json:"type"`
-	URL          string             `bson:"url" json:"url"`
-	ThumbnailURL string             `bson:"thumbnailUrl,omitempty" json:"thumbnailUrl,omitempty"`
-	Caption      string             `bson:"caption,omitempty" json:"caption,omitempty"`
-	CreatedAt    time.Time          `bson:"createdAt" json:"createdAt"`
+	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
+	UserID    primitive.ObjectID `bson:"userId" json:"userId"`
+	Type      ContentType        `bson:"type" json:"type"`
+	URL       string             `bson:"url" json:"url"`
+	Caption   string             `bson:"caption,omitempty" json:"caption,omitempty"`
+	CreatedAt time.Time          `bson:"createdAt" json:"createdAt"`
 }

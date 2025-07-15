@@ -20,11 +20,12 @@ type Config struct {
 	EthRPCURL           string
 
 	// MinIO Configuration
-	MinioEndpoint   string
-	MinioAccessKey  string
-	MinioSecretKey  string
-	MinioUseSSL     bool
-	MinioBucketName string
+	MinioEndpoint      string
+	MinioAccessKey     string
+	MinioSecretKey     string
+	MinioUseSSL        bool
+	MinioPostsBucket   string
+	MinioStoriesBucket string
 
 	// Redis Configuration
 	RedisAddr     string
@@ -70,7 +71,8 @@ func LoadConfig() (*Config, error) {
 		MinioAccessKey:      os.Getenv("MINIO_ACCESS_KEY"),
 		MinioSecretKey:      os.Getenv("MINIO_SECRET_KEY"),
 		MinioUseSSL:         useSSL,
-		MinioBucketName:     os.Getenv("MINIO_BUCKET_NAME"),
+		MinioPostsBucket:    os.Getenv("MINIO_POSTS_BUCKET"),
+		MinioStoriesBucket:  os.Getenv("MINIO_STORIES_BUCKET"),
 		RedisAddr:           os.Getenv("REDIS_ADDR"),
 		RedisPassword:       os.Getenv("REDIS_PASSWORD"),
 		RedisDB:             redisDB,

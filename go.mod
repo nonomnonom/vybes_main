@@ -1,6 +1,8 @@
 module vybes
 
-go 1.24.4
+go 1.23.0
+
+toolchain go1.24.4
 
 require (
 	github.com/ethereum/go-ethereum v1.16.1
