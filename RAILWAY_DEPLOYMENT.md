@@ -20,11 +20,11 @@ The Vybes application is designed as a microservices architecture with the follo
    - NATS cluster for real-time notifications
    - High availability with automatic failover
 
-3. **Storage Nodes** (MinIO Cluster)
-   - **storage-1**, **storage-2**, **storage-3**: Distributed object storage
-   - MinIO cluster for file storage (posts, stories, user avatars)
-   - S3-compatible object storage with replication
-   - Ports: 9000 (API), 9001 (Console)
+3. **External Storage** (Cloudflare R2)
+   - **Cloudflare R2**: S3-compatible object storage
+   - Stores posts, stories, user avatars, and media files
+   - Global CDN for fast content delivery
+   - No egress fees, cost-effective storage solution
 
 ## Railway Configuration
 
@@ -56,9 +56,13 @@ You need to set these environment variables in Railway:
 #### Cache
 - `REDIS_PASSWORD`: Redis authentication password
 
-#### Storage
-- `MINIO_ACCESS_KEY`: MinIO access key
-- `MINIO_SECRET_KEY`: MinIO secret key
+#### External Storage (R2)
+- `R2_ACCOUNT_ID`: Cloudflare R2 account ID
+- `R2_ACCESS_KEY_ID`: R2 API access key ID
+- `R2_SECRET_ACCESS_KEY`: R2 API secret access key
+- `R2_ENDPOINT`: R2 endpoint URL
+- `R2_POSTS_BUCKET`: Bucket name for posts
+- `R2_STORIES_BUCKET`: Bucket name for stories
 
 #### External Services
 - `RESEND_API_KEY`: Resend email service API key
@@ -104,8 +108,13 @@ railway variables set JWT_SECRET=your-jwt-secret
 railway variables set WALLET_ENCRYPTION_KEY=your-wallet-key
 railway variables set MONGO_URI=mongodb://mongodb:27017
 railway variables set REDIS_ADDR=redis:6379
-railway variables set MINIO_ENDPOINT=minio:9000
 railway variables set NATS_URL=nats://nats:4222
+railway variables set R2_ACCOUNT_ID=your-r2-account-id
+railway variables set R2_ACCESS_KEY_ID=your-r2-access-key-id
+railway variables set R2_SECRET_ACCESS_KEY=your-r2-secret-access-key
+railway variables set R2_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
+railway variables set R2_POSTS_BUCKET=vybes-posts
+railway variables set R2_STORIES_BUCKET=vybes-stories
 # ... set all other required variables
 ```
 
@@ -139,8 +148,13 @@ Services communicate using Railway's internal networking with cluster endpoints:
 
 - **MongoDB Cluster**: `mongodb://worker-1:27017,worker-2:27017,worker-3:27017/vybes_production?replicaSet=vybes-rs`
 - **Redis Cluster**: `worker-1:6379,worker-2:6379,worker-3:6379`
-- **MinIO Cluster**: `storage-1:9000,storage-2:9000,storage-3:9000`
 - **NATS Cluster**: `nats://worker-1:4222,nats://worker-2:4222,nats://worker-3:4222`
+
+### External Storage (R2)
+
+- **R2 Endpoint**: `https://{ACCOUNT_ID}.r2.cloudflarestorage.com`
+- **Authentication**: API keys managed through Cloudflare dashboard
+- **Buckets**: Separate buckets for posts and stories
 
 ### Health Checks
 
@@ -148,7 +162,7 @@ Each service includes health checks:
 - API: `GET /health` returns 200 OK
 - Database: Connection verification
 - Cache: Redis ping
-- Storage: MinIO bucket access
+- Storage: R2 bucket access verification
 - Message Queue: NATS connection
 
 ## Scaling Configuration
@@ -170,17 +184,14 @@ Each service includes health checks:
 
 ### Development Environment
 - Database: `vybes_development`
-- MinIO SSL: Disabled
 - Debug logging enabled
 
 ### Staging Environment
 - Database: `vybes_staging`
-- MinIO SSL: Enabled
 - Production-like configuration
 
 ### Production Environment
 - Database: `vybes_production`
-- MinIO SSL: Enabled
 - Full production configuration
 
 ## Monitoring & Logging
@@ -210,9 +221,9 @@ Each service includes health checks:
    - Check authentication credentials
 
 3. **Storage Access Problems**
-   - Verify MinIO credentials
-   - Check bucket permissions
-   - Ensure SSL configuration matches environment
+   - Verify R2 credentials in Cloudflare dashboard
+   - Check bucket permissions and policies
+   - Ensure R2 endpoint is correctly configured
 
 4. **Message Queue Issues**
    - Confirm NATS service is running
@@ -250,7 +261,7 @@ railway variables
 ### Data Protection
 - Database connections use authentication
 - Redis requires password
-- MinIO uses access keys
+- R2 uses IAM policies and bucket policies
 - JWT tokens for API authentication
 
 ## Performance Optimization
@@ -267,9 +278,10 @@ railway variables
 - Query optimization
 
 ### Storage Optimization
-- MinIO for efficient object storage
+- R2 for efficient object storage
 - Image compression for uploads
-- CDN integration for static assets
+- Global CDN for fast content delivery
+- No egress fees for cost optimization
 
 ## Backup & Recovery
 
@@ -279,8 +291,8 @@ railway variables
 - Cross-region backup replication
 
 ### Application Data
-- MinIO data replication
+- R2 data replication and versioning
 - Configuration version control
 - Environment-specific backups
 
-This deployment configuration provides a robust, scalable, and production-ready setup for the Vybes application on Railway's platform.
+This deployment configuration provides a robust, scalable, and production-ready setup for the Vybes application on Railway's platform with cost-effective external storage via Cloudflare R2.

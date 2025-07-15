@@ -40,19 +40,9 @@
     └──────────────┼──────────────┘
                    │
     ┌──────────────┴──────────────┐
-    │      STORAGE CLUSTER        │
-    │         (MinIO)             │
-    └──────────────┬──────────────┘
-                   │
-    ┌──────────────┼──────────────┐
-    │              │              │
-┌───▼───┐    ┌────▼────┐    ┌────▼────┐
-│STORAGE-1│   │STORAGE-2│    │STORAGE-3│
-│MinIO   │   │MinIO    │    │MinIO    │
-│Ports:  │   │Ports:   │    │Ports:   │
-│9000    │   │9000     │    │9000     │
-│9001    │   │9001     │    │9001     │
-└───────┘    └─────────┘    └─────────┘
+    │      EXTERNAL STORAGE       │
+    │      (Cloudflare R2)        │
+    └─────────────────────────────┘
 ```
 
 ## 📊 **Service Breakdown**
@@ -70,12 +60,10 @@
 | `worker-2` | ✅ | ✅ | ✅ | Secondary worker |
 | `worker-3` | ✅ | ✅ | ✅ | Tertiary worker |
 
-### **Storage Layer (3 Nodes)**
-| Service | MinIO | Replication | Purpose |
-|---------|-------|-------------|---------|
-| `storage-1` | ✅ | 3x | Primary storage |
-| `storage-2` | ✅ | 3x | Secondary storage |
-| `storage-3` | ✅ | 3x | Tertiary storage |
+### **External Storage (Cloudflare R2)**
+| Service | Type | Replication | Purpose |
+|---------|------|-------------|---------|
+| Cloudflare R2 | S3-Compatible | Global CDN | Object storage for posts, stories, and media |
 
 ## 🔄 **High Availability Features**
 
@@ -99,10 +87,11 @@
 - **Message Persistence**: Messages stored across multiple nodes
 - **Auto-recovery**: Failed nodes automatically rejoin cluster
 
-### **5. Storage Replication**
-- **MinIO Distributed**: 3-node MinIO cluster with erasure coding
-- **Data Protection**: Files replicated across 3 nodes
+### **5. External Storage (R2)**
+- **Cloudflare R2**: S3-compatible object storage
+- **Global CDN**: Content delivered from edge locations worldwide
 - **High Durability**: 99.999999999% (11 9's) durability
+- **Cost Effective**: No egress fees, pay only for storage and requests
 
 ## 🚀 **Performance Benefits**
 
@@ -120,6 +109,7 @@
 - **Reduced Latency**: Closer nodes to users
 - **Parallel Processing**: Multiple nodes handle requests simultaneously
 - **Caching**: Distributed cache reduces database load
+- **Global CDN**: R2 provides fast content delivery worldwide
 
 ## 🔧 **Configuration Details**
 
@@ -145,15 +135,16 @@ worker-1:6379,worker-2:6379,worker-3:6379
 - Failover enabled
 ```
 
-### **MinIO Distributed**
+### **Cloudflare R2**
 ```bash
-# Connection string
-storage-1:9000,storage-2:9000,storage-3:9000
+# Endpoint
+https://{ACCOUNT_ID}.r2.cloudflarestorage.com
 
-# Distributed configuration
-- 3 nodes with erasure coding
-- 2 parity blocks (can lose 2 nodes)
-- Automatic data rebalancing
+# Configuration
+- S3-compatible API
+- Global CDN integration
+- No egress fees
+- Automatic scaling
 ```
 
 ### **NATS Cluster**
@@ -177,8 +168,8 @@ nats://worker-1:4222,nats://worker-2:4222,nats://worker-3:4222
 ### **Estimated Monthly Cost**
 - **API Nodes**: $20-200 (depending on traffic)
 - **Worker Nodes**: $30-150 (database + cache + queue)
-- **Storage Nodes**: $30-200 (depending on storage usage)
-- **Total**: $80-550/month for enterprise-grade setup
+- **R2 Storage**: $5-50 (depending on storage usage, no egress fees)
+- **Total**: $55-400/month for enterprise-grade setup
 
 ## 🛡️ **Security Features**
 
@@ -191,5 +182,6 @@ nats://worker-1:4222,nats://worker-2:4222,nats://worker-3:4222
 - **Encryption at Rest**: All data encrypted on disk
 - **Encryption in Transit**: TLS for all communications
 - **Authentication**: Strong authentication for all services
+- **R2 Security**: IAM policies, bucket policies, and encryption
 
-This cluster architecture provides enterprise-grade reliability, scalability, and performance for the Vybes application!
+This cluster architecture provides enterprise-grade reliability, scalability, and performance for the Vybes application with cost-effective external storage!

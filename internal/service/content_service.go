@@ -61,7 +61,7 @@ func (s *contentService) CreatePost(ctx context.Context, userIDStr, caption stri
 	objectName := fmt.Sprintf("posts/%s/%s", userID.Hex(), uuid.New().String())
 	contentType := fileHeader.Header.Get("Content-Type")
 
-	uploadInfo, err := s.storage.UploadFile(ctx, s.cfg.MinioPostsBucket, objectName, file, fileHeader.Size, contentType)
+	uploadInfo, err := s.storage.UploadFile(ctx, s.cfg.R2PostsBucket, objectName, file, fileHeader.Size, contentType)
 	if err != nil {
 		return nil, err
 	}
@@ -124,10 +124,11 @@ func (s *contentService) DeletePost(ctx context.Context, userIDStr, postIDStr st
 		// Log this, but proceed with deletion of the post itself
 	}
 
-	// 3. Delete file from MinIO
+	// 3. Delete file from R2
 	if content != nil && content.URL != "" {
-		objectName := strings.TrimPrefix(content.URL, s.cfg.MinioEndpoint+"/"+s.cfg.MinioPostsBucket+"/")
-		s.storage.DeleteFile(ctx, s.cfg.MinioPostsBucket, objectName)
+		// Extract object name from URL (assuming URL format: https://bucket.r2.cloudflarestorage.com/object-name)
+		objectName := strings.TrimPrefix(content.URL, s.cfg.R2Endpoint+"/"+s.cfg.R2PostsBucket+"/")
+		s.storage.DeleteFile(ctx, s.cfg.R2PostsBucket, objectName)
 	}
 
 	// 4. Delete the post and content documents
