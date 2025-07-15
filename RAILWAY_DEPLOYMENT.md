@@ -162,14 +162,15 @@ Each service includes health checks:
 ### Auto-scaling Rules
 
 - **Minimum Replicas**: 1
-- **Maximum Replicas**: 5
-- **CPU Threshold**: 70%
-- **Memory Threshold**: 80%
+- **Maximum Replicas**: 10
+- **CPU Threshold**: 80%
+- **Memory Threshold**: 85%
 
 ### Resource Allocation
 
-- **CPU**: 1000m (1 core)
-- **Memory**: 2Gi
+- **CPU**: Auto-allocated by Railway based on demand
+- **Memory**: Auto-allocated by Railway based on usage
+- **No fixed limits**: Allows Railway to optimize performance
 
 ## Environment Management
 

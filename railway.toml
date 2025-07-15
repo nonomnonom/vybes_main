@@ -98,14 +98,13 @@ service = "nats"
 # Scaling Configuration
 [services.scaling]
 minReplicas = 1
-maxReplicas = 5
-targetCPUUtilizationPercentage = 70
-targetMemoryUtilizationPercentage = 80
+maxReplicas = 10
+targetCPUUtilizationPercentage = 80
+targetMemoryUtilizationPercentage = 85
 
-# Resource Limits
-[services.resources]
-cpu = "1000m"
-memory = "2Gi"
+# Resource Limits - Let Railway auto-scale based on demand
+# Railway will automatically allocate resources based on actual usage
+# No need to set fixed limits for better performance
 
 # Network Configuration
 [services.network]
