@@ -14,17 +14,19 @@ import (
 
 // CronService manages scheduled tasks.
 type CronService struct {
-	cfg       *config.Config
-	storyRepo repository.StoryRepository
-	storage   storage.Client
+	cfg            *config.Config
+	storyRepo      repository.StoryRepository
+	tippingService *TippingService
+	storage        storage.Client
 }
 
 // NewCronService creates a new cron service.
-func NewCronService(cfg *config.Config, storyRepo repository.StoryRepository, storage storage.Client) *CronService {
+func NewCronService(cfg *config.Config, storyRepo repository.StoryRepository, tippingService *TippingService, storage storage.Client) *CronService {
 	return &CronService{
-		cfg:       cfg,
-		storyRepo: storyRepo,
-		storage:   storage,
+		cfg:            cfg,
+		storyRepo:      storyRepo,
+		tippingService: tippingService,
+		storage:        storage,
 	}
 }
 
@@ -34,6 +36,12 @@ func (s *CronService) Start() {
 
 	// Schedule a job to run every hour to clean up expired stories.
 	c.AddFunc("@hourly", s.cleanupExpiredStories)
+	
+	// Schedule weekly tipping allowance reset (every Monday at 00:00)
+	c.AddFunc("0 0 * * 1", s.resetWeeklyTippingAllowances)
+	
+	// Schedule weekly tipping stats reset (every Monday at 00:01)
+	c.AddFunc("0 1 * * 1", s.resetWeeklyTippingStats)
 
 	log.Info().Msg("Starting cron jobs...")
 	c.Start()
@@ -85,4 +93,30 @@ func (s *CronService) cleanupExpiredStories() {
 	}
 
 	log.Info().Int("count", len(storyIDsToDelete)).Msg("Successfully cleaned up expired stories.")
+}
+
+func (s *CronService) resetWeeklyTippingAllowances() {
+	log.Info().Msg("Running weekly tipping allowance reset job...")
+	ctx := context.Background()
+
+	err := s.tippingService.ResetWeeklyAllowances(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to reset weekly tipping allowances")
+		return
+	}
+
+	log.Info().Msg("Successfully reset weekly tipping allowances.")
+}
+
+func (s *CronService) resetWeeklyTippingStats() {
+	log.Info().Msg("Running weekly tipping stats reset job...")
+	ctx := context.Background()
+
+	err := s.tippingService.ResetWeeklyStats(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to reset weekly tipping stats")
+		return
+	}
+
+	log.Info().Msg("Successfully reset weekly tipping stats.")
 }
