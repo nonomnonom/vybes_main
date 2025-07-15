@@ -1,0 +1,137 @@
+[build]
+builder = "dockerfile"
+
+[deploy]
+startCommand = "./vybes-api"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10
+
+[[services]]
+name = "vybes-api"
+source = "."
+environment = "production"
+
+[services.variables]
+PORT = ":8080"
+DB_NAME = "vybes_production"
+
+# MongoDB Configuration
+MONGO_URI = "{{MONGO_URI}}"
+
+# JWT and Security
+JWT_SECRET = "{{JWT_SECRET}}"
+WALLET_ENCRYPTION_KEY = "{{WALLET_ENCRYPTION_KEY}}"
+
+# Email Service (Resend)
+RESEND_API_KEY = "{{RESEND_API_KEY}}"
+SENDER_EMAIL = "{{SENDER_EMAIL}}"
+
+# Ethereum Configuration
+ETH_RPC_URL = "{{ETH_RPC_URL}}"
+
+# MinIO Configuration
+MINIO_ENDPOINT = "{{MINIO_ENDPOINT}}"
+MINIO_ACCESS_KEY = "{{MINIO_ACCESS_KEY}}"
+MINIO_SECRET_KEY = "{{MINIO_SECRET_KEY}}"
+MINIO_USE_SSL = "true"
+MINIO_POSTS_BUCKET = "vybes-posts"
+MINIO_STORIES_BUCKET = "vybes-stories"
+
+# Redis Configuration
+REDIS_ADDR = "{{REDIS_ADDR}}"
+REDIS_PASSWORD = "{{REDIS_PASSWORD}}"
+REDIS_DB = "0"
+
+# NATS Configuration
+NATS_URL = "{{NATS_URL}}"
+
+[[services]]
+name = "mongodb"
+image = "mongo:7.0"
+environment = "production"
+
+[services.variables]
+MONGO_INITDB_ROOT_USERNAME = "{{MONGO_ROOT_USERNAME}}"
+MONGO_INITDB_ROOT_PASSWORD = "{{MONGO_ROOT_PASSWORD}}"
+MONGO_INITDB_DATABASE = "vybes_production"
+
+[[services]]
+name = "redis"
+image = "redis:7.2-alpine"
+environment = "production"
+
+[services.variables]
+REDIS_PASSWORD = "{{REDIS_PASSWORD}}"
+
+[[services]]
+name = "minio"
+image = "minio/minio:latest"
+environment = "production"
+
+[services.variables]
+MINIO_ROOT_USER = "{{MINIO_ACCESS_KEY}}"
+MINIO_ROOT_PASSWORD = "{{MINIO_SECRET_KEY}}"
+
+[[services]]
+name = "nats"
+image = "nats:2.10-alpine"
+environment = "production"
+
+[services.variables]
+NATS_CLUSTER_NAME = "vybes-cluster"
+
+# Service Dependencies
+[[services.dependencies]]
+service = "mongodb"
+
+[[services.dependencies]]
+service = "redis"
+
+[[services.dependencies]]
+service = "minio"
+
+[[services.dependencies]]
+service = "nats"
+
+# Scaling Configuration
+[services.scaling]
+minReplicas = 1
+maxReplicas = 5
+targetCPUUtilizationPercentage = 70
+targetMemoryUtilizationPercentage = 80
+
+# Resource Limits
+[services.resources]
+cpu = "1000m"
+memory = "2Gi"
+
+# Network Configuration
+[services.network]
+port = 8080
+protocol = "http"
+
+# Health Check Configuration
+[services.healthcheck]
+path = "/health"
+interval = "30s"
+timeout = "10s"
+retries = 3
+startPeriod = "60s"
+
+# Environment-specific configurations
+[environments.development]
+[environments.development.variables]
+DB_NAME = "vybes_development"
+MINIO_USE_SSL = "false"
+
+[environments.staging]
+[environments.staging.variables]
+DB_NAME = "vybes_staging"
+MINIO_USE_SSL = "true"
+
+[environments.production]
+[environments.production.variables]
+DB_NAME = "vybes_production"
+MINIO_USE_SSL = "true"
