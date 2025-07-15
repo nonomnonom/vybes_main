@@ -7,10 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"vybes/internal/config"
 	"vybes/internal/domain"
 	"vybes/internal/repository"
 	"vybes/pkg/storage"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -29,15 +31,21 @@ type ContentService interface {
 	DeletePost(ctx context.Context, postID, userID primitive.ObjectID) error
 	// GetFeedPosts retrieves posts for a user's feed based on followed users
 	GetFeedPosts(ctx context.Context, userID primitive.ObjectID, page, limit int) ([]domain.Post, error)
+	Repost(ctx context.Context, userID, originalPostID primitive.ObjectID) (*domain.Post, error)
+	GetRepostsByUser(ctx context.Context, userID primitive.ObjectID, limit int) ([]domain.Post, error)
+	CreateComment(ctx context.Context, userID, postID primitive.ObjectID, text string) (*domain.Comment, error)
+	GetComments(ctx context.Context, postID primitive.ObjectID, page, limit int) ([]domain.Comment, error)
+	RecordView(ctx context.Context, postID primitive.ObjectID) error
 }
 
 // contentService implements ContentService with business logic for content management
 type contentService struct {
 	contentRepository     repository.ContentRepository
 	userRepository        repository.UserRepository
+	followRepository      repository.FollowRepository
 	storageClient         storage.Client
 	notificationPublisher NotificationPublisher
-	config                *domain.Config
+	config                *config.Config
 }
 
 // NewContentService creates a new content service instance with all required dependencies.
@@ -52,10 +60,11 @@ type contentService struct {
 //
 // Returns:
 //   - ContentService: A configured content service ready for use
-func NewContentService(contentRepository repository.ContentRepository, userRepository repository.UserRepository, storageClient storage.Client, notificationPublisher NotificationPublisher, config *domain.Config) ContentService {
+func NewContentService(contentRepository repository.ContentRepository, userRepository repository.UserRepository, followRepository repository.FollowRepository, storageClient storage.Client, notificationPublisher NotificationPublisher, config *config.Config) ContentService {
 	return &contentService{
 		contentRepository:     contentRepository,
 		userRepository:        userRepository,
+		followRepository:      followRepository,
 		storageClient:         storageClient,
 		notificationPublisher: notificationPublisher,
 		config:                config,
@@ -135,7 +144,7 @@ func (s *contentService) CreatePost(ctx context.Context, userID primitive.Object
 	}
 
 	// Publish notification for new post (if public)
-	if visibility == domain.PostVisibilityPublic {
+	if visibility == domain.VisibilityPublic {
 		// TODO: Implement notification publishing for new posts
 	}
 
@@ -168,24 +177,17 @@ func (s *contentService) DeletePost(ctx context.Context, postID, userID primitiv
 		return fmt.Errorf("unauthorized: user does not own this post")
 	}
 
-	// 2. Get the associated content to find file URLs
-	content, err := s.contentRepository.GetContentByID(ctx, post.ContentID)
-	if err != nil {
-		// Log this, but proceed with deletion of the post itself
-		log.Warn().Err(err).Msg("Failed to get content for post deletion")
-	}
-
-	// 3. Delete file from R2 if content exists
-	if content != nil && content.FileURL != "" {
+	// 2. Delete file from R2 if content exists
+	if post.ContentURL != "" {
 		// Extract object name from URL (assuming URL format: https://bucket.r2.cloudflarestorage.com/object-name)
-		objectName := strings.TrimPrefix(content.FileURL, fmt.Sprintf("https://%s.r2.cloudflarestorage.com/", s.config.R2BucketName))
+		objectName := strings.TrimPrefix(post.ContentURL, fmt.Sprintf("https://%s.r2.cloudflarestorage.com/", s.config.R2BucketName))
 		
 		if err := s.storageClient.DeleteFile(ctx, s.config.R2BucketName, objectName); err != nil {
 			log.Error().Err(err).Msg("Failed to delete file from storage during post deletion")
 		}
 	}
 
-	// 4. Delete the post and content documents
+	// 3. Delete the post and content documents
 	if err := s.contentRepository.DeletePost(ctx, postID, userID); err != nil {
 		// Log this error
 		log.Error().Err(err).Msg("Failed to delete post from database")
@@ -196,4 +198,104 @@ func (s *contentService) DeletePost(ctx context.Context, postID, userID primitiv
 	// This should be implemented as a background job to avoid blocking the user request.
 
 	return nil
+}
+
+func (s *contentService) GetPostByID(ctx context.Context, postID primitive.ObjectID) (*domain.Post, error) {
+	return s.contentRepository.GetPostByID(ctx, postID)
+}
+
+func (s *contentService) GetPostsByUserID(ctx context.Context, userID primitive.ObjectID, page, limit int) ([]domain.Post, error) {
+	return s.contentRepository.GetPostsByUserID(ctx, userID, page, limit)
+}
+
+func (s *contentService) GetFeedPosts(ctx context.Context, userID primitive.ObjectID, page, limit int) ([]domain.Post, error) {
+	following, err := s.followRepository.GetFollowing(ctx, userID, 1, 1000) //TODO: handle pagination
+	if err != nil {
+		return nil, err
+	}
+
+	followingIDs := make([]primitive.ObjectID, len(following))
+	for i, f := range following {
+		followingIDs[i] = f.FollowingID
+	}
+	followingIDs = append(followingIDs, userID)
+
+	return s.contentRepository.GetFeedPosts(ctx, followingIDs, page, limit)
+}
+
+func (s *contentService) Repost(ctx context.Context, userID, originalPostID primitive.ObjectID) (*domain.Post, error) {
+	//TODO: implement
+	return nil, nil
+}
+
+func (s *contentService) GetRepostsByUser(ctx context.Context, userID primitive.ObjectID, limit int) ([]domain.Post, error) {
+	//TODO: implement
+	return nil, nil
+}
+
+func (s *contentService) CreateComment(ctx context.Context, userID, postID primitive.ObjectID, text string) (*domain.Comment, error) {
+	comment := &domain.Comment{
+		ID:        primitive.NewObjectID(),
+		UserID:    userID,
+		PostID:    postID,
+		Text:      text,
+		CreatedAt: time.Now(),
+	}
+	err := s.contentRepository.CreateComment(ctx, comment)
+	return comment, err
+}
+
+func (s *contentService) GetComments(ctx context.Context, postID primitive.ObjectID, page, limit int) ([]domain.Comment, error) {
+	return s.contentRepository.GetCommentsByPostID(ctx, postID, page, limit)
+}
+
+func (s *contentService) RecordView(ctx context.Context, postID primitive.ObjectID) error {
+	//TODO: implement
+	return nil
+}
+
+func (s *contentService) validateFile(file *multipart.FileHeader) error {
+	// 50MB limit
+	if file.Size > 50*1024*1024 {
+		return fmt.Errorf("file size exceeds 50MB limit")
+	}
+
+	// Check file type
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	allowedExts := []string{".jpg", ".jpeg", ".png", ".gif", ".webp", ".mp4", ".mov"}
+	for _, allowedExt := range allowedExts {
+		if ext == allowedExt {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("unsupported file type: %s", ext)
+}
+
+func (s *contentService) uploadFile(ctx context.Context, file *multipart.FileHeader) (string, error) {
+	src, err := file.Open()
+	if err != nil {
+		return "", err
+	}
+	defer src.Close()
+
+	key := fmt.Sprintf("posts/%s%s", uuid.New().String(), filepath.Ext(file.Filename))
+	uploadInfo, err := s.storageClient.UploadFile(ctx, s.config.R2PostsBucket, key, src)
+	if err != nil {
+		return "", err
+	}
+
+	return uploadInfo.URL, nil
+}
+
+func (s *contentService) determineContentType(filename string) domain.ContentType {
+	ext := strings.ToLower(filepath.Ext(filename))
+	switch ext {
+	case ".jpg", ".jpeg", ".png", ".gif", ".webp":
+		return domain.ContentTypeImage
+	case ".mp4", ".mov":
+		return domain.ContentTypeVideo
+	default:
+		return domain.ContentTypeVideo
+	}
 }

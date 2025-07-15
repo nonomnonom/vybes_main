@@ -115,3 +115,19 @@ func (r *mongoNotificationRepository) MarkAsRead(ctx context.Context, notificati
 	_, err := r.collection.UpdateOne(ctx, filter, update)
 	return err
 }
+
+func (r *mongoNotificationRepository) MarkAllAsRead(ctx context.Context, userID primitive.ObjectID) error {
+	filter := bson.M{"userid": userID}
+	update := bson.M{"$set": bson.M{"read": true}}
+	_, err := r.collection.UpdateMany(ctx, filter, update)
+	return err
+}
+
+func (r *mongoNotificationRepository) GetUnreadCount(ctx context.Context, userID primitive.ObjectID) (int64, error) {
+	return r.collection.CountDocuments(ctx, bson.M{"userid": userID, "read": false})
+}
+
+func (r *mongoNotificationRepository) DeleteNotification(ctx context.Context, notificationID, userID primitive.ObjectID) error {
+	_, err := r.collection.DeleteOne(ctx, bson.M{"_id": notificationID, "userid": userID})
+	return err
+}

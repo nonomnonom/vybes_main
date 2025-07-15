@@ -22,7 +22,7 @@ func NewReactionHandler(reactionService service.ReactionService) *ReactionHandle
 
 // AddLike is the handler for liking a post.
 func (h *ReactionHandler) AddLike(c *gin.Context) {
-	userID, _ := c.Get("userID")
+	userID, _ := c.Get("user_id")
 	postID := c.Param("postID")
 
 	err := h.reactionService.AddReaction(c.Request.Context(), userID.(string), postID, string(domain.ReactionTypeLike))
@@ -35,7 +35,7 @@ func (h *ReactionHandler) AddLike(c *gin.Context) {
 
 // RemoveLike is the handler for unliking a post.
 func (h *ReactionHandler) RemoveLike(c *gin.Context) {
-	userID, _ := c.Get("userID")
+	userID, _ := c.Get("user_id")
 	postID := c.Param("postID")
 
 	err := h.reactionService.RemoveReaction(c.Request.Context(), userID.(string), postID, string(domain.ReactionTypeLike))

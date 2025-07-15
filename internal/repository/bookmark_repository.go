@@ -17,13 +17,13 @@ type BookmarkRepository interface {
 	// CreateBookmark saves a content item to a user's bookmarks
 	CreateBookmark(ctx context.Context, bookmark *domain.Bookmark) error
 	// DeleteBookmark removes a content item from a user's bookmarks
-	DeleteBookmark(ctx context.Context, userID, contentID primitive.ObjectID) error
+	DeleteBookmark(ctx context.Context, userID, postID primitive.ObjectID) error
 	// GetUserBookmarks retrieves all bookmarked content for a specific user
 	GetUserBookmarks(ctx context.Context, userID primitive.ObjectID, page, limit int) ([]domain.Bookmark, error)
 	// IsBookmarked checks if a user has bookmarked a specific content item
-	IsBookmarked(ctx context.Context, userID, contentID primitive.ObjectID) (bool, error)
+	IsBookmarked(ctx context.Context, userID, postID primitive.ObjectID) (bool, error)
 	// GetBookmarkCount returns the number of bookmarks for a content item
-	GetBookmarkCount(ctx context.Context, contentID primitive.ObjectID) (int64, error)
+	GetBookmarkCount(ctx context.Context, postID primitive.ObjectID) (int64, error)
 }
 
 // mongoBookmarkRepository implements BookmarkRepository using MongoDB as the backend
@@ -59,11 +59,52 @@ func (r *mongoBookmarkRepository) CreateBookmark(ctx context.Context, bookmark *
 	// Use upsert to avoid duplicate bookmarks
 	filter := bson.M{
 		"userid":    bookmark.UserID,
-		"contentid": bookmark.ContentID,
+		"postid": bookmark.PostID,
 	}
 	update := bson.M{"$setOnInsert": bookmark}
 	opts := options.Update().SetUpsert(true)
 	
 	_, err := r.collection.UpdateOne(ctx, filter, update, opts)
 	return err
+}
+
+// DeleteBookmark removes a content item from a user's bookmarks.
+func (r *mongoBookmarkRepository) DeleteBookmark(ctx context.Context, userID, postID primitive.ObjectID) error {
+	filter := bson.M{
+		"userid":    userID,
+		"postid": postID,
+	}
+	_, err := r.collection.DeleteOne(ctx, filter)
+	return err
+}
+
+// GetUserBookmarks retrieves all bookmarked content for a specific user.
+func (r *mongoBookmarkRepository) GetUserBookmarks(ctx context.Context, userID primitive.ObjectID, page, limit int) ([]domain.Bookmark, error) {
+	var bookmarks []domain.Bookmark
+	opts := options.Find().SetSkip(int64((page - 1) * limit)).SetLimit(int64(limit))
+	cursor, err := r.collection.Find(ctx, bson.M{"userid": userID}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	err = cursor.All(ctx, &bookmarks)
+	return bookmarks, err
+}
+
+// IsBookmarked checks if a user has bookmarked a specific content item.
+func (r *mongoBookmarkRepository) IsBookmarked(ctx context.Context, userID, postID primitive.ObjectID) (bool, error) {
+	filter := bson.M{
+		"userid":    userID,
+		"postid": postID,
+	}
+	count, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// GetBookmarkCount returns the number of bookmarks for a content item.
+func (r *mongoBookmarkRepository) GetBookmarkCount(ctx context.Context, postID primitive.ObjectID) (int64, error) {
+	return r.collection.CountDocuments(ctx, bson.M{"postid": postID})
 }

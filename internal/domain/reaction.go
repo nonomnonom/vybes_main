@@ -15,9 +15,9 @@ const (
 
 // Reaction represents a reaction to a post.
 type Reaction struct {
-	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
-	UserID    primitive.ObjectID `bson:"userId" json:"userId"`
-	PostID    primitive.ObjectID `bson:"postId" json:"postId"`
-	Type      ReactionType       `bson:"type" json:"type"`
-	CreatedAt time.Time          `bson:"createdAt" json:"createdAt"`
+	ID           primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
+	UserID       primitive.ObjectID `bson:"userId" json:"userId"`
+	ContentID    primitive.ObjectID `bson:"contentId" json:"contentId"`
+	ReactionType ReactionType       `bson:"reactionType" json:"reactionType"`
+	CreatedAt    time.Time          `bson:"createdAt" json:"createdAt"`
 }

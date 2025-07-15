@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
-	"fmt"
 )
 
 // Encrypt encrypts plaintext data using AES-GCM encryption with the provided key.

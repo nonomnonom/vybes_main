@@ -69,7 +69,7 @@ func SetupRouter(
 
 		// Authenticated routes
 		authRoutes := apiV1.Group("/")
-		authRoutes.Use(middleware.AuthMiddleware(cfg, sessionService))
+		authRoutes.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 		{
 			// Search routes
 			authRoutes.GET("/search/users", searchHandler.SearchUsers)

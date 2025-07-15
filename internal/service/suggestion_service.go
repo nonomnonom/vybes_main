@@ -71,5 +71,5 @@ func (s *suggestionService) GetSuggestions(ctx context.Context, userIDStr string
 		return []domain.User{}, nil
 	}
 
-	return s.userRepo.FindManyByIDs(ctx, suggestionIDs)
+	return s.userRepo.GetUsersByIDs(ctx, suggestionIDs)
 }

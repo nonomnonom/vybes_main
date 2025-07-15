@@ -48,17 +48,17 @@ func (s *reactionService) AddReaction(ctx context.Context, userIDStr, postIDStr,
 	}
 
 	reaction := &domain.Reaction{
-		ID:        primitive.NewObjectID(),
-		UserID:    userID,
-		PostID:    postID,
-		Type:      domain.ReactionType(reactionTypeStr),
-		CreatedAt: time.Now(),
+		ID:           primitive.NewObjectID(),
+		UserID:       userID,
+		ContentID:    postID,
+		ReactionType: domain.ReactionType(reactionTypeStr),
+		CreatedAt:    time.Now(),
 	}
 
 	if err := s.reactionRepo.AddReaction(ctx, reaction); err != nil {
 		return err
 	}
-	if reaction.Type == domain.ReactionTypeLike {
+	if reaction.ReactionType == domain.ReactionTypeLike {
 		if err := s.userRepo.IncrementTotalLikes(ctx, post.UserID, 1); err != nil {
 			return err
 		}

@@ -20,9 +20,11 @@ type Config struct {
 	EthRPCURL           string
 
 	// R2 Configuration
+	R2AccountID       string
 	R2Endpoint        string
 	R2AccessKeyID     string
 	R2SecretAccessKey string
+	R2BucketName      string
 	R2PostsBucket     string
 	R2StoriesBucket   string
 
@@ -61,9 +63,11 @@ func LoadConfig() (*Config, error) {
 		SenderEmail:         os.Getenv("SENDER_EMAIL"),
 		WalletEncryptionKey: os.Getenv("WALLET_ENCRYPTION_KEY"),
 		EthRPCURL:           os.Getenv("ETH_RPC_URL"),
+		R2AccountID:         os.Getenv("R2_ACCOUNT_ID"),
 		R2Endpoint:          os.Getenv("R2_ENDPOINT"),
 		R2AccessKeyID:       os.Getenv("R2_ACCESS_KEY_ID"),
 		R2SecretAccessKey:   os.Getenv("R2_SECRET_ACCESS_KEY"),
+		R2BucketName:        os.Getenv("R2_BUCKET_NAME"),
 		R2PostsBucket:       os.Getenv("R2_POSTS_BUCKET"),
 		R2StoriesBucket:     os.Getenv("R2_STORIES_BUCKET"),
 		RedisAddr:           os.Getenv("REDIS_ADDR"),

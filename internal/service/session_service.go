@@ -9,6 +9,15 @@ import (
 	"vybes/internal/repository"
 )
 
+// SessionServiceInterface defines the interface for session business logic.
+type SessionServiceInterface interface {
+	Create(ctx context.Context, userID primitive.ObjectID, refreshToken, userAgent, clientIP string) (*domain.Session, error)
+	GetByID(ctx context.Context, id primitive.ObjectID) (*domain.Session, error)
+	Block(ctx context.Context, id primitive.ObjectID) error
+}
+// Ensure *SessionService implements SessionServiceInterface
+var _ SessionServiceInterface = (*SessionService)(nil)
+
 type SessionService struct {
 	sessionRepo *repository.SessionRepository
 }

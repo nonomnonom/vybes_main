@@ -81,11 +81,14 @@ func main() {
 	walletService := service.NewWalletService(cfg)
 	notificationService := service.NewNotificationService(notificationRepository)
 	sessionService := service.NewSessionService(sessionRepository)
+	// Pass pointers to the session repository and service
+// Cast the pointers to interfaces to satisfy the function signature
+// Cast the pointers to interfaces to satisfy the function signature
 	userService := service.NewUserService(userRepository, followRepository, counterRepository, sessionRepository, walletService, emailService, sessionService, cacheClient, cfg.JWTSecret, cfg.WalletEncryptionKey)
 	followService := service.NewFollowService(followRepository, userRepository, notificationPublisher)
 	suggestionService := service.NewSuggestionService(userRepository, followRepository)
 	storyService := service.NewStoryService(storyRepository, followRepository, storageClient, cfg)
-	contentService := service.NewContentService(contentRepository, userRepository, storageClient, notificationPublisher, cfg)
+	contentService := service.NewContentService(contentRepository, userRepository, followRepository, storageClient, notificationPublisher, cfg)
 	reactionService := service.NewReactionService(reactionRepository, contentRepository, userRepository, notificationPublisher)
 	feedService := service.NewFeedService(contentRepository, followRepository)
 	bookmarkService := service.NewBookmarkService(bookmarkRepository, contentRepository)

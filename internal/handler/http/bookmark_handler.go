@@ -6,6 +6,7 @@ import (
 	"vybes/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // BookmarkHandler handles HTTP requests for bookmarks.
@@ -22,10 +23,10 @@ func NewBookmarkHandler(bookmarkService service.BookmarkService) *BookmarkHandle
 
 // AddBookmark is the handler for adding a bookmark.
 func (h *BookmarkHandler) AddBookmark(c *gin.Context) {
-	userID, _ := c.Get("userID")
+	userID, _ := c.Get("user_id")
 	postID := c.Param("postID")
 
-	err := h.bookmarkService.AddBookmark(c.Request.Context(), userID.(string), postID)
+	err := h.bookmarkService.AddBookmark(c.Request.Context(), userID.(primitive.ObjectID).Hex(), postID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -35,10 +36,10 @@ func (h *BookmarkHandler) AddBookmark(c *gin.Context) {
 
 // RemoveBookmark is the handler for removing a bookmark.
 func (h *BookmarkHandler) RemoveBookmark(c *gin.Context) {
-	userID, _ := c.Get("userID")
+	userID, _ := c.Get("user_id")
 	postID := c.Param("postID")
 
-	err := h.bookmarkService.RemoveBookmark(c.Request.Context(), userID.(string), postID)
+	err := h.bookmarkService.RemoveBookmark(c.Request.Context(), userID.(primitive.ObjectID).Hex(), postID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -48,10 +49,11 @@ func (h *BookmarkHandler) RemoveBookmark(c *gin.Context) {
 
 // GetBookmarks is the handler for getting the user's bookmarked posts.
 func (h *BookmarkHandler) GetBookmarks(c *gin.Context) {
-	userID, _ := c.Get("userID")
+	userID, _ := c.Get("user_id")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 
-	posts, err := h.bookmarkService.GetBookmarks(c.Request.Context(), userID.(string), limit)
+	posts, err := h.bookmarkService.GetBookmarks(c.Request.Context(), userID.(primitive.ObjectID).Hex(), page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get bookmarks"})
 		return

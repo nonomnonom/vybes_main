@@ -8,7 +8,7 @@ import (
 
 // SearchService defines the interface for search business logic.
 type SearchService interface {
-	SearchUsers(ctx context.Context, query string, limit int) ([]domain.User, error)
+	SearchUsers(ctx context.Context, query string, page, limit int) ([]domain.User, error)
 }
 
 type searchService struct {
@@ -22,6 +22,6 @@ func NewSearchService(userRepo repository.UserRepository) SearchService {
 	}
 }
 
-func (s *searchService) SearchUsers(ctx context.Context, query string, limit int) ([]domain.User, error) {
-	return s.userRepo.SearchUsers(ctx, query, limit)
+func (s *searchService) SearchUsers(ctx context.Context, query string, page, limit int) ([]domain.User, error) {
+	return s.userRepo.SearchUsers(ctx, query, page, limit)
 }

@@ -6,6 +6,7 @@ import (
 	"vybes/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // NotificationHandler handles HTTP requests for notifications.
@@ -22,10 +23,11 @@ func NewNotificationHandler(notificationService service.NotificationService) *No
 
 // GetNotifications is the handler for fetching a user's notifications.
 func (h *NotificationHandler) GetNotifications(c *gin.Context) {
-	userID, _ := c.Get("userID")
+	userID, _ := c.Get("user_id")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "30"))
 
-	notifications, err := h.notificationService.GetNotifications(c.Request.Context(), userID.(string), limit)
+	notifications, err := h.notificationService.GetNotifications(c.Request.Context(), userID.(primitive.ObjectID).Hex(), page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get notifications"})
 		return
@@ -35,7 +37,7 @@ func (h *NotificationHandler) GetNotifications(c *gin.Context) {
 
 // MarkAsRead is the handler for marking notifications as read.
 func (h *NotificationHandler) MarkAsRead(c *gin.Context) {
-	userID, _ := c.Get("userID")
+	userID, _ := c.Get("user_id")
 	var request struct {
 		NotificationIDs []string `json:"notificationIds" binding:"required"`
 	}
@@ -44,7 +46,7 @@ func (h *NotificationHandler) MarkAsRead(c *gin.Context) {
 		return
 	}
 
-	modifiedCount, err := h.notificationService.MarkNotificationsAsRead(c.Request.Context(), userID.(string), request.NotificationIDs)
+	modifiedCount, err := h.notificationService.MarkNotificationsAsRead(c.Request.Context(), userID.(primitive.ObjectID).Hex(), request.NotificationIDs)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark notifications as read"})
 		return

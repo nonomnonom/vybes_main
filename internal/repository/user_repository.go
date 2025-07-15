@@ -23,6 +23,7 @@ type UserRepository interface {
 	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
 	// GetUserByUsername retrieves a user by their username
 	GetUserByUsername(ctx context.Context, username string) (*domain.User, error)
+	GetUserByVID(ctx context.Context, vid int64) (*domain.User, error)
 	// GetUserByWalletAddress retrieves a user by their wallet address
 	GetUserByWalletAddress(ctx context.Context, walletAddress string) (*domain.User, error)
 	// UpdateUser updates an existing user's information
@@ -33,6 +34,7 @@ type UserRepository interface {
 	SearchUsers(ctx context.Context, query string, page, limit int) ([]domain.User, error)
 	// GetUsersByIDs retrieves multiple users by their IDs
 	GetUsersByIDs(ctx context.Context, userIDs []primitive.ObjectID) ([]domain.User, error)
+	IncrementTotalLikes(ctx context.Context, userID primitive.ObjectID, count int) error
 }
 
 // mongoUserRepository implements UserRepository using MongoDB as the backend
@@ -53,4 +55,81 @@ func NewMongoUserRepository(db *mongo.Database) UserRepository {
 	return &mongoUserRepository{
 		collection: db.Collection("users"),
 	}
+}
+
+func (r *mongoUserRepository) CreateUser(ctx context.Context, user *domain.User) error {
+	_, err := r.collection.InsertOne(ctx, user)
+	return err
+}
+
+func (r *mongoUserRepository) GetUserByID(ctx context.Context, userID primitive.ObjectID) (*domain.User, error) {
+	var user domain.User
+	err := r.collection.FindOne(ctx, bson.M{"_id": userID}).Decode(&user)
+	return &user, err
+}
+
+func (r *mongoUserRepository) GetUserByEmail(ctx context.Context, email string) (*domain.User, error) {
+	var user domain.User
+	err := r.collection.FindOne(ctx, bson.M{"email": email}).Decode(&user)
+	return &user, err
+}
+
+func (r *mongoUserRepository) GetUserByUsername(ctx context.Context, username string) (*domain.User, error) {
+	var user domain.User
+	err := r.collection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
+	return &user, err
+}
+
+func (r *mongoUserRepository) GetUserByVID(ctx context.Context, vid int64) (*domain.User, error) {
+	var user domain.User
+	err := r.collection.FindOne(ctx, bson.M{"vid": vid}).Decode(&user)
+	return &user, err
+}
+
+func (r *mongoUserRepository) GetUserByWalletAddress(ctx context.Context, walletAddress string) (*domain.User, error) {
+	var user domain.User
+	err := r.collection.FindOne(ctx, bson.M{"walletaddress": walletAddress}).Decode(&user)
+	return &user, err
+}
+
+func (r *mongoUserRepository) UpdateUser(ctx context.Context, user *domain.User) error {
+	_, err := r.collection.UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{"$set": user})
+	return err
+}
+
+func (r *mongoUserRepository) DeleteUser(ctx context.Context, userID primitive.ObjectID) error {
+	_, err := r.collection.DeleteOne(ctx, bson.M{"_id": userID})
+	return err
+}
+
+func (r *mongoUserRepository) SearchUsers(ctx context.Context, query string, page, limit int) ([]domain.User, error) {
+	var users []domain.User
+	filter := bson.M{"$or": []bson.M{
+		{"name": bson.M{"$regex": query, "$options": "i"}},
+		{"username": bson.M{"$regex": query, "$options": "i"}},
+	}}
+	opts := options.Find().SetSkip(int64((page - 1) * limit)).SetLimit(int64(limit))
+	cursor, err := r.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	err = cursor.All(ctx, &users)
+	return users, err
+}
+
+func (r *mongoUserRepository) GetUsersByIDs(ctx context.Context, userIDs []primitive.ObjectID) ([]domain.User, error) {
+	var users []domain.User
+	cursor, err := r.collection.Find(ctx, bson.M{"_id": bson.M{"$in": userIDs}})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	err = cursor.All(ctx, &users)
+	return users, err
+}
+
+func (r *mongoUserRepository) IncrementTotalLikes(ctx context.Context, userID primitive.ObjectID, count int) error {
+	_, err := r.collection.UpdateOne(ctx, bson.M{"_id": userID}, bson.M{"$inc": bson.M{"totallikecount": count}})
+	return err
 }

@@ -22,7 +22,7 @@ func NewFeedHandler(feedService service.FeedService) *FeedHandler {
 
 // GetForYouFeed is the handler for getting the user's "For You" feed.
 func (h *FeedHandler) GetForYouFeed(c *gin.Context) {
-	userID, _ := c.Get("userID")
+	userID, _ := c.Get("user_id")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 
 	feed, err := h.feedService.GetForYouFeed(c.Request.Context(), userID.(string), limit)
@@ -35,7 +35,7 @@ func (h *FeedHandler) GetForYouFeed(c *gin.Context) {
 
 // GetFriendFeed is the handler for getting the user's "Friend" feed.
 func (h *FeedHandler) GetFriendFeed(c *gin.Context) {
-	userID, _ := c.Get("userID")
+	userID, _ := c.Get("user_id")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 
 	feed, err := h.feedService.GetFriendFeed(c.Request.Context(), userID.(string), limit)

@@ -76,7 +76,7 @@ func (h *UserHandler) RefreshToken(c *gin.Context) {
 }
 
 func (h *UserHandler) UnlockWallet(c *gin.Context) {
-	userID, exists := c.Get("userID")
+	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in token"})
 		return
@@ -97,7 +97,7 @@ func (h *UserHandler) UnlockWallet(c *gin.Context) {
 }
 
 func (h *UserHandler) GetUserProfile(c *gin.Context) {
-	viewerID, exists := c.Get("userID")
+	viewerID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in token"})
 		return
@@ -130,7 +130,7 @@ func (h *UserHandler) GetUserProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, profile)
 }
 func (h *UserHandler) UpdateProfile(c *gin.Context) {
-	userID, exists := c.Get("userID")
+	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in token"})
 		return
@@ -148,7 +148,7 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, updatedUser)
 }
 func (h *UserHandler) ExportPrivateKey(c *gin.Context) {
-	userID, exists := c.Get("userID")
+	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in token"})
 		return
@@ -168,7 +168,7 @@ func (h *UserHandler) ExportPrivateKey(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"privateKey": privateKey})
 }
 func (h *UserHandler) PersonalSign(c *gin.Context) {
-	userID, exists := c.Get("userID")
+	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in token"})
 		return
@@ -188,7 +188,7 @@ func (h *UserHandler) PersonalSign(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"signature": signature})
 }
 func (h *UserHandler) SignTransaction(c *gin.Context) {
-	userID, exists := c.Get("userID")
+	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in token"})
 		return
@@ -213,7 +213,7 @@ func (h *UserHandler) SignTransaction(c *gin.Context) {
 	c.JSON(http.StatusOK, signedTx)
 }
 func (h *UserHandler) SignTypedDataV4(c *gin.Context) {
-	userID, exists := c.Get("userID")
+	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in token"})
 		return
@@ -233,7 +233,7 @@ func (h *UserHandler) SignTypedDataV4(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"signature": signature})
 }
 func (h *UserHandler) SendTransaction(c *gin.Context) {
-	userID, exists := c.Get("userID")
+	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in token"})
 		return
@@ -258,7 +258,7 @@ func (h *UserHandler) SendTransaction(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"transactionHash": txHash.Hex()})
 }
 func (h *UserHandler) Secp256k1Sign(c *gin.Context) {
-	userID, exists := c.Get("userID")
+	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in token"})
 		return

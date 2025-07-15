@@ -13,7 +13,7 @@ import (
 type BookmarkService interface {
 	AddBookmark(ctx context.Context, userID, postID string) error
 	RemoveBookmark(ctx context.Context, userID, postID string) error
-	GetBookmarks(ctx context.Context, userID string, limit int) ([]domain.Post, error)
+	GetBookmarks(ctx context.Context, userID string, page, limit int) ([]domain.Post, error)
 }
 
 type bookmarkService struct {
@@ -44,7 +44,7 @@ func (s *bookmarkService) AddBookmark(ctx context.Context, userIDStr, postIDStr 
 		PostID:    postID,
 		CreatedAt: time.Now(),
 	}
-	return s.bookmarkRepo.Add(ctx, bookmark)
+	return s.bookmarkRepo.CreateBookmark(ctx, bookmark)
 }
 
 func (s *bookmarkService) RemoveBookmark(ctx context.Context, userIDStr, postIDStr string) error {
@@ -56,16 +56,16 @@ func (s *bookmarkService) RemoveBookmark(ctx context.Context, userIDStr, postIDS
 	if err != nil {
 		return err
 	}
-	return s.bookmarkRepo.Remove(ctx, userID, postID)
+	return s.bookmarkRepo.DeleteBookmark(ctx, userID, postID)
 }
 
-func (s *bookmarkService) GetBookmarks(ctx context.Context, userIDStr string, limit int) ([]domain.Post, error) {
+func (s *bookmarkService) GetBookmarks(ctx context.Context, userIDStr string, page, limit int) ([]domain.Post, error) {
 	userID, err := primitive.ObjectIDFromHex(userIDStr)
 	if err != nil {
 		return nil, err
 	}
 
-	bookmarks, err := s.bookmarkRepo.FindByUser(ctx, userID, limit)
+	bookmarks, err := s.bookmarkRepo.GetUserBookmarks(ctx, userID, page, limit)
 	if err != nil {
 		return nil, err
 	}

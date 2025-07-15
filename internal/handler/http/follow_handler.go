@@ -21,7 +21,7 @@ func NewFollowHandler(followService service.FollowService) *FollowHandler {
 
 // FollowUser is the handler for following a user.
 func (h *FollowHandler) FollowUser(c *gin.Context) {
-	followerID, exists := c.Get("userID")
+	followerID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in token"})
 		return
@@ -40,7 +40,7 @@ func (h *FollowHandler) FollowUser(c *gin.Context) {
 
 // UnfollowUser is the handler for unfollowing a user.
 func (h *FollowHandler) UnfollowUser(c *gin.Context) {
-	followerID, exists := c.Get("userID")
+	followerID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in token"})
 		return

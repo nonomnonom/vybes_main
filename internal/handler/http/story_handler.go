@@ -21,7 +21,7 @@ func NewStoryHandler(storyService service.StoryService) *StoryHandler {
 
 // CreateStory is the handler for uploading a new story.
 func (h *StoryHandler) CreateStory(c *gin.Context) {
-	userID, exists := c.Get("userID")
+	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in token"})
 		return
@@ -44,7 +44,7 @@ func (h *StoryHandler) CreateStory(c *gin.Context) {
 
 // GetStoryFeed is the handler for getting the user's story feed.
 func (h *StoryHandler) GetStoryFeed(c *gin.Context) {
-	userID, exists := c.Get("userID")
+	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in token"})
 		return

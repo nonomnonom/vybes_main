@@ -21,7 +21,7 @@ func NewSuggestionHandler(suggestionService service.SuggestionService) *Suggesti
 
 // GetSuggestions is the handler for getting user follow suggestions.
 func (h *SuggestionHandler) GetSuggestions(c *gin.Context) {
-	userID, exists := c.Get("userID")
+	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in token"})
 		return

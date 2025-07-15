@@ -12,7 +12,7 @@ import (
 // NotificationService defines the interface for notification business logic.
 type NotificationService interface {
 	CreateNotification(ctx context.Context, userID, actorID primitive.ObjectID, notifType domain.NotificationType, postID *primitive.ObjectID) error
-	GetNotifications(ctx context.Context, userID string, limit int) ([]domain.Notification, error)
+	GetNotifications(ctx context.Context, userID string, page, limit int) ([]domain.Notification, error)
 	MarkNotificationsAsRead(ctx context.Context, userID string, notificationIDs []string) (int64, error)
 }
 
@@ -42,15 +42,15 @@ func (s *notificationService) CreateNotification(ctx context.Context, userID, ac
 		Read:      false,
 		CreatedAt: time.Now(),
 	}
-	return s.notificationRepo.Create(ctx, notification)
+	return s.notificationRepo.CreateNotification(ctx, notification)
 }
 
-func (s *notificationService) GetNotifications(ctx context.Context, userIDStr string, limit int) ([]domain.Notification, error) {
+func (s *notificationService) GetNotifications(ctx context.Context, userIDStr string, page, limit int) ([]domain.Notification, error) {
 	userID, err := primitive.ObjectIDFromHex(userIDStr)
 	if err != nil {
 		return nil, err
 	}
-	return s.notificationRepo.GetNotificationsForUser(ctx, userID, limit)
+	return s.notificationRepo.GetUserNotifications(ctx, userID, page, limit)
 }
 
 func (s *notificationService) MarkNotificationsAsRead(ctx context.Context, userIDStr string, notificationIDStrs []string) (int64, error) {
@@ -59,17 +59,15 @@ func (s *notificationService) MarkNotificationsAsRead(ctx context.Context, userI
 		return 0, err
 	}
 
-	var notificationIDs []primitive.ObjectID
+	var successCount int64
 	for _, idStr := range notificationIDStrs {
 		id, err := primitive.ObjectIDFromHex(idStr)
 		if err == nil {
-			notificationIDs = append(notificationIDs, id)
+			if err := s.notificationRepo.MarkAsRead(ctx, id, userID); err == nil {
+				successCount++
+			}
 		}
 	}
 
-	if len(notificationIDs) == 0 {
-		return 0, nil
-	}
-
-	return s.notificationRepo.MarkAsRead(ctx, notificationIDs, userID)
+	return successCount, nil
 }

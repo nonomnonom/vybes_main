@@ -9,7 +9,17 @@ import (
 	"vybes/internal/domain"
 )
 
+// SessionRepositoryInterface defines the interface for session data operations.
+type SessionRepositoryInterface interface {
+	Create(ctx context.Context, session *domain.Session) error
+	GetByID(ctx context.Context, id primitive.ObjectID) (*domain.Session, error)
+	FindByRefreshToken(ctx context.Context, refreshToken string) (*domain.Session, error)
+	Block(ctx context.Context, id primitive.ObjectID) error
+}
 const sessionCollection = "sessions"
+
+// Ensure *SessionRepository implements SessionRepositoryInterface
+var _ SessionRepositoryInterface = (*SessionRepository)(nil)
 
 type SessionRepository struct {
 	db *mongo.Database

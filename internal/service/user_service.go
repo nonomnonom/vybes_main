@@ -54,7 +54,7 @@ type UserService interface {
 	UpdateProfile(ctx context.Context, userID string, payload UpdateProfilePayload) (*domain.User, error)
 	ExportPrivateKey(ctx context.Context, userID, password string) (string, error)
 	PersonalSign(ctx context.Context, userID, message string) (string, error)
-	SignTransaction(ctx context.Context, userID string, tx *types.Transaction) (*types.Transaction, error)
+	SignTransaction(ctx context.Context, userID string, tx *types.Transaction) (string, error)
 	SendTransaction(ctx context.Context, userID string, tx *types.Transaction) (common.Hash, error)
 	SignTypedDataV4(ctx context.Context, userID string, typedData apitypes.TypedData) (string, error)
 	Secp256k1Sign(ctx context.Context, userID, hash string) (string, error)
@@ -66,17 +66,17 @@ type userService struct {
 	userRepo            repository.UserRepository
 	followRepo          repository.FollowRepository
 	counterRepo         repository.CounterRepository
-	sessionRepo         *repository.SessionRepository
+	sessionRepo         repository.ISessionRepository
 	walletService       WalletService
 	emailService        EmailService
-	sessionService      *SessionService
+	sessionService      ISessionService
 	cache               cache.Client
 	jwtSecret           string
 	walletEncryptionKey string
 }
 
 // NewUserService creates a new user service.
-func NewUserService(userRepo repository.UserRepository, followRepo repository.FollowRepository, counterRepo repository.CounterRepository, sessionRepo *repository.SessionRepository, walletService WalletService, emailService EmailService, sessionService *SessionService, cache cache.Client, jwtSecret, walletEncryptionKey string) UserService {
+func NewUserService(userRepo repository.UserRepository, followRepo repository.FollowRepository, counterRepo repository.CounterRepository, sessionRepo repository.ISessionRepository, walletService WalletService, emailService EmailService, sessionService ISessionService, cache cache.Client, jwtSecret, walletEncryptionKey string) UserService {
 	return &userService{
 		userRepo:            userRepo,
 		followRepo:          followRepo,
@@ -93,7 +93,7 @@ func NewUserService(userRepo repository.UserRepository, followRepo repository.Fo
 
 // ... (Register, Login are unchanged)
 func (s *userService) Register(ctx context.Context, name, email, password string) error {
-	existingUser, err := s.userRepo.FindByEmail(ctx, email)
+	existingUser, err := s.userRepo.GetUserByEmail(ctx, email)
 	if err != nil {
 		return err
 	}
@@ -121,10 +121,10 @@ func (s *userService) Register(ctx context.Context, name, email, password string
 		WalletAddress:       walletAddress,
 		EncryptedPrivateKey: encryptedPrivateKey,
 	}
-	return s.userRepo.Create(ctx, user)
+	return s.userRepo.CreateUser(ctx, user)
 }
 func (s *userService) Login(ctx context.Context, email, password, userAgent, clientIP string) (*LoginResponse, error) {
-	user, err := s.userRepo.FindByEmail(ctx, email)
+	user, err := s.userRepo.GetUserByEmail(ctx, email)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func (s *userService) Login(ctx context.Context, email, password, userAgent, cli
 		return nil, errors.New("invalid credentials")
 	}
 
-	refreshToken, err := utils.GenerateRandomString(32)
+	refreshToken, err := utils.GenerateRandomString(32, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +172,7 @@ func (s *userService) RefreshToken(ctx context.Context, refreshToken string) (*L
 		return nil, errors.New("invalid or expired refresh token")
 	}
 
-	user, err := s.userRepo.FindByID(ctx, session.UserID)
+	user, err := s.userRepo.GetUserByID(ctx, session.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +200,7 @@ func (s *userService) UnlockWallet(ctx context.Context, userIDStr, password stri
 	if err != nil {
 		return errors.New("invalid user ID format")
 	}
-	user, err := s.userRepo.FindByID(ctx, userID)
+	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
 		return err
 	}
@@ -210,7 +210,7 @@ func (s *userService) UnlockWallet(ctx context.Context, userIDStr, password stri
 	if !utils.CheckPasswordHash(password, user.Password) {
 		return errors.New("invalid password")
 	}
-	decryptedKey, err := utils.Decrypt(user.EncryptedPrivateKey, s.walletEncryptionKey)
+	decryptedKey, err := utils.Decrypt(user.EncryptedPrivateKey, []byte(s.walletEncryptionKey))
 	if err != nil {
 		return errors.New("could not decrypt private key")
 	}
@@ -224,9 +224,9 @@ func (s *userService) GetUserProfile(ctx context.Context, viewerIDStr string, vi
 	var err error
 
 	if vid != nil {
-		profileUser, err = s.userRepo.FindByVID(ctx, *vid)
+		profileUser, err = s.userRepo.GetUserByVID(ctx, *vid)
 	} else if username != nil {
-		profileUser, err = s.userRepo.FindByUsername(ctx, *username)
+		profileUser, err = s.userRepo.GetUserByUsername(ctx, *username)
 	} else {
 		return nil, errors.New("must provide vid or username")
 	}
@@ -289,7 +289,7 @@ func (s *userService) UpdateProfile(ctx context.Context, userID string, payload 
 	if err != nil {
 		return nil, errors.New("invalid user ID format")
 	}
-	user, err := s.userRepo.FindByID(ctx, objID)
+	user, err := s.userRepo.GetUserByID(ctx, objID)
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +312,7 @@ func (s *userService) UpdateProfile(ctx context.Context, userID string, payload 
 	if payload.Bio != nil {
 		user.Bio = *payload.Bio
 	}
-	if err := s.userRepo.Update(ctx, user); err != nil {
+	if err := s.userRepo.UpdateUser(ctx, user); err != nil {
 		return nil, err
 	}
 	return user, nil
@@ -324,7 +324,7 @@ func (s *userService) ExportPrivateKey(ctx context.Context, userIDStr, password 
 	if err != nil {
 		return "", errors.New("invalid user ID format")
 	}
-	user, err := s.userRepo.FindByID(ctx, userID)
+	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
 		return "", err
 	}
@@ -334,7 +334,7 @@ func (s *userService) ExportPrivateKey(ctx context.Context, userIDStr, password 
 	if !utils.CheckPasswordHash(password, user.Password) {
 		return "", errors.New("invalid password")
 	}
-	decryptedKey, err := utils.Decrypt(user.EncryptedPrivateKey, s.walletEncryptionKey)
+	decryptedKey, err := utils.Decrypt(user.EncryptedPrivateKey, []byte(s.walletEncryptionKey))
 	if err != nil {
 		return "", errors.New("could not decrypt private key")
 	}
@@ -350,19 +350,19 @@ func (s *userService) PersonalSign(ctx context.Context, userIDStr, message strin
 	if err != nil {
 		return "", err
 	}
-	return signer.PersonalSign([]byte(message))
+	return signer.PersonalSign(message)
 }
-func (s *userService) SignTransaction(ctx context.Context, userIDStr string, tx *types.Transaction) (*types.Transaction, error) {
+func (s *userService) SignTransaction(ctx context.Context, userIDStr string, tx *types.Transaction) (string, error) {
 	cacheKey := fmt.Sprintf("wallet:%s", userIDStr)
 	decryptedKey, err := s.cache.Get(ctx, cacheKey)
 	if err != nil {
-		return nil, errors.New("wallet is locked")
+		return "", errors.New("wallet is locked")
 	}
 	signer, err := evm.NewSignerFromHex(decryptedKey)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return signer.SignTransaction(tx)
+	return signer.SignTransaction(tx.Nonce(), tx.To(), tx.Value(), tx.Gas(), tx.GasPrice(), tx.Data(), tx.ChainId())
 }
 func (s *userService) SignTypedDataV4(ctx context.Context, userIDStr string, typedData apitypes.TypedData) (string, error) {
 	cacheKey := fmt.Sprintf("wallet:%s", userIDStr)
@@ -401,7 +401,7 @@ func (s *userService) Secp256k1Sign(ctx context.Context, userIDStr, hashStr stri
 	return signer.Secp256k1Sign(hash)
 }
 func (s *userService) RequestOTP(ctx context.Context, email string) error {
-	user, err := s.userRepo.FindByEmail(ctx, email)
+	user, err := s.userRepo.GetUserByEmail(ctx, email)
 	if err != nil {
 		return err
 	}
@@ -414,13 +414,13 @@ func (s *userService) RequestOTP(ctx context.Context, email string) error {
 	}
 	user.OTP = otp
 	user.OTPExpires = time.Now().Add(time.Minute * 5)
-	if err := s.userRepo.Update(ctx, user); err != nil {
+	if err := s.userRepo.UpdateUser(ctx, user); err != nil {
 		return err
 	}
 	return s.emailService.SendOTPEmail(user.Email, otp)
 }
 func (s *userService) VerifyOTPAndResetPassword(ctx context.Context, email, otp, newPassword string) error {
-	user, err := s.userRepo.FindByEmail(ctx, email)
+	user, err := s.userRepo.GetUserByEmail(ctx, email)
 	if err != nil {
 		return err
 	}
@@ -434,5 +434,5 @@ func (s *userService) VerifyOTPAndResetPassword(ctx context.Context, email, otp,
 	user.Password = hashedPassword
 	user.OTP = ""
 	user.OTPExpires = time.Time{}
-	return s.userRepo.Update(ctx, user)
+	return s.userRepo.UpdateUser(ctx, user)
 }

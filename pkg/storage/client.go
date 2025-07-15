@@ -7,11 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"vybes/internal/config"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"vybes/internal/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 // UploadInfo contains metadata about a successful file upload operation
@@ -34,6 +35,7 @@ type Client interface {
 // r2Client implements the Client interface using Cloudflare R2 as the backend
 type r2Client struct {
 	s3Client *s3.Client
+	cfg      *config.Config
 }
 
 // NewClient creates and initializes a new R2 storage client with the provided configuration.
@@ -55,9 +57,9 @@ func NewClient(ctx context.Context, cfg *config.Config) (Client, error) {
 	})
 
 	// Load AWS config with R2 credentials
-	awsconfig, err := config.LoadDefaultConfig(ctx,
-		config.WithEndpointResolverWithOptions(customResolver),
-		config.WithCredentialsProvider(aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
+	sdkConfig, err := awsconfig.LoadDefaultConfig(ctx,
+		awsconfig.WithEndpointResolverWithOptions(customResolver),
+		awsconfig.WithCredentialsProvider(aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
 			return aws.Credentials{
 				AccessKeyID:     cfg.R2AccessKeyID,
 				SecretAccessKey: cfg.R2SecretAccessKey,
@@ -69,7 +71,7 @@ func NewClient(ctx context.Context, cfg *config.Config) (Client, error) {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
-	s3Client := s3.NewFromConfig(awsconfig)
+	s3Client := s3.NewFromConfig(sdkConfig)
 
 	// Ensure all required buckets exist
 	requiredBuckets := []string{cfg.R2BucketName}
@@ -79,7 +81,7 @@ func NewClient(ctx context.Context, cfg *config.Config) (Client, error) {
 		}
 	}
 
-	return &r2Client{s3Client: s3Client}, nil
+	return &r2Client{s3Client: s3Client, cfg: cfg}, nil
 }
 
 // ensureBucketExists checks if a bucket exists and creates it if it doesn't.
@@ -142,24 +144,23 @@ func (c *r2Client) UploadFile(ctx context.Context, bucket, key string, reader io
 	}
 
 	// Upload file to R2
-	result, err := c.s3Client.PutObject(ctx, &s3.PutObjectInput{
+	_, err := c.s3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(bucket),
 		Key:         aws.String(key),
 		Body:        reader,
 		ContentType: aws.String(contentType),
-		ACL:         "public-read", // Make file publicly accessible
+		ACL:         types.ObjectCannedACLPublicRead, // Make file publicly accessible
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload file: %w", err)
 	}
 
 	// Construct public URL
-	url := fmt.Sprintf("https://%s.r2.cloudflarestorage.com/%s", bucket, key)
+	url := fmt.Sprintf("https://%s.r2.cloudflarestorage.com/%s", c.cfg.R2AccountID, key)
 
 	return &UploadInfo{
 		URL:      url,
 		Key:      key,
-		Size:     *result.ContentLength,
 		Uploaded: time.Now(),
 	}, nil
 }

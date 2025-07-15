@@ -8,7 +8,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // ReactionRepository defines the interface for reaction data operations.
@@ -76,7 +75,7 @@ func (r *mongoReactionRepository) AddReaction(ctx context.Context, reaction *dom
 		var existingReaction domain.Reaction
 		err := r.collection.FindOne(sessCtx, filter).Decode(&existingReaction)
 		if err == nil {
-			return err // Error or reaction already exists
+			return nil, fmt.Errorf("reaction already exists")
 		}
 
 		// Insert the new reaction
@@ -126,7 +125,7 @@ func (r *mongoReactionRepository) RemoveReaction(ctx context.Context, userID, co
 		
 		result, err := r.collection.DeleteOne(sessCtx, filter)
 		if err != nil || result.DeletedCount == 0 {
-			return err // Error or reaction didn't exist
+			return nil, fmt.Errorf("reaction not found")
 		}
 
 		// Decrement the correct counter on the post
@@ -138,4 +137,53 @@ func (r *mongoReactionRepository) RemoveReaction(ctx context.Context, userID, co
 	})
 
 	return err
+}
+
+func (r *mongoReactionRepository) GetReactionsByContentID(ctx context.Context, contentID primitive.ObjectID) ([]domain.Reaction, error) {
+	var reactions []domain.Reaction
+	cursor, err := r.collection.Find(ctx, bson.M{"contentid": contentID})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	err = cursor.All(ctx, &reactions)
+	return reactions, err
+}
+
+func (r *mongoReactionRepository) GetReactionCounts(ctx context.Context, contentID primitive.ObjectID) (map[domain.ReactionType]int64, error) {
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{"contentid": contentID}}},
+		{{Key: "$group", Value: bson.M{"_id": "$reactiontype", "count": bson.M{"$sum": 1}}}},
+	}
+	cursor, err := r.collection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	counts := make(map[domain.ReactionType]int64)
+	for cursor.Next(ctx) {
+		var result struct {
+			Type  domain.ReactionType `bson:"_id"`
+			Count int64               `bson:"count"`
+		}
+		if err := cursor.Decode(&result); err != nil {
+			return nil, err
+		}
+		counts[result.Type] = result.Count
+	}
+	return counts, nil
+}
+
+func (r *mongoReactionRepository) HasUserReacted(ctx context.Context, userID, contentID primitive.ObjectID, reactionType domain.ReactionType) (bool, error) {
+	filter := bson.M{
+		"userid":      userID,
+		"contentid":   contentID,
+		"reactiontype": reactionType,
+	}
+	count, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }

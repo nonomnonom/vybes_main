@@ -36,7 +36,7 @@ func (s *followService) FollowUser(ctx context.Context, followerIDStr, following
 		return errors.New("invalid follower ID format")
 	}
 
-	userToFollow, err := s.userRepo.FindByUsername(ctx, followingUsername)
+	userToFollow, err := s.userRepo.GetUserByUsername(ctx, followingUsername)
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,11 @@ func (s *followService) FollowUser(ctx context.Context, followerIDStr, following
 		return errors.New("cannot follow yourself")
 	}
 
-	if err := s.followRepo.Follow(ctx, followerID, userToFollow.ID); err != nil {
+	follow := &domain.Follow{
+		FollowerID:  followerID,
+		FollowingID: userToFollow.ID,
+	}
+	if err := s.followRepo.CreateFollow(ctx, follow); err != nil {
 		return err
 	}
 
@@ -68,7 +72,7 @@ func (s *followService) UnfollowUser(ctx context.Context, followerIDStr, followi
 		return errors.New("invalid follower ID format")
 	}
 
-	userToUnfollow, err := s.userRepo.FindByUsername(ctx, followingUsername)
+	userToUnfollow, err := s.userRepo.GetUserByUsername(ctx, followingUsername)
 	if err != nil {
 		return err
 	}
@@ -76,5 +80,5 @@ func (s *followService) UnfollowUser(ctx context.Context, followerIDStr, followi
 		return errors.New("user to unfollow not found")
 	}
 
-	return s.followRepo.Unfollow(ctx, followerID, userToUnfollow.ID)
+	return s.followRepo.DeleteFollow(ctx, followerID, userToUnfollow.ID)
 }

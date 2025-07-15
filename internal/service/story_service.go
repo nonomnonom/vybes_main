@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-
 	"mime/multipart"
 	"time"
 	"vybes/internal/config"
@@ -52,10 +51,9 @@ func (s *storyService) CreateStory(ctx context.Context, userIDStr string, fileHe
 
 	// Generate a unique object name
 	objectName := fmt.Sprintf("stories/%s/%s", userID.Hex(), uuid.New().String())
-	contentType := fileHeader.Header.Get("Content-Type")
 
 	// Upload to R2
-	uploadInfo, err := s.storage.UploadFile(ctx, s.cfg.R2StoriesBucket, objectName, file, fileHeader.Size, contentType)
+	uploadInfo, err := s.storage.UploadFile(ctx, s.cfg.R2StoriesBucket, objectName, file)
 	if err != nil {
 		return nil, err
 	}
@@ -64,13 +62,13 @@ func (s *storyService) CreateStory(ctx context.Context, userIDStr string, fileHe
 	story := &domain.Story{
 		ID:        primitive.NewObjectID(),
 		UserID:    userID,
-		MediaURL:  uploadInfo.Location, // Or construct a public URL
-		MediaType: contentType,
+		MediaURL:  uploadInfo.URL, // Or construct a public URL
+		MediaType: fileHeader.Header.Get("Content-Type"),
 		CreatedAt: time.Now(),
 		ExpiresAt: time.Now().Add(24 * time.Hour),
 	}
 
-	if err := s.storyRepo.Create(ctx, story); err != nil {
+	if err := s.storyRepo.CreateStory(ctx, story); err != nil {
 		// TODO: Implement logic to delete the object from R2 if this fails
 		return nil, err
 	}
@@ -93,5 +91,5 @@ func (s *storyService) GetStoryFeed(ctx context.Context, userIDStr string) ([]do
 	// Also include the user's own stories in their feed
 	followingIDs = append(followingIDs, userID)
 
-	return s.storyRepo.GetStoriesByUsers(ctx, followingIDs)
+	return s.storyRepo.GetStoriesForFeed(ctx, followingIDs)
 }

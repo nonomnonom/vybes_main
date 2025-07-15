@@ -29,7 +29,8 @@ func (h *SearchHandler) SearchUsers(c *gin.Context) {
 	}
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 
-	users, err := h.searchService.SearchUsers(c.Request.Context(), query, limit)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	users, err := h.searchService.SearchUsers(c.Request.Context(), query, page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search users"})
 		return

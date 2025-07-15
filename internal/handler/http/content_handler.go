@@ -7,6 +7,7 @@ import (
 	"vybes/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // ContentHandler handles HTTP requests for content and comments.
@@ -23,7 +24,7 @@ func NewContentHandler(contentService service.ContentService) *ContentHandler {
 
 // CreatePost is the handler for uploading new content as a post.
 func (h *ContentHandler) CreatePost(c *gin.Context) {
-	userID, _ := c.Get("userID")
+	userID, _ := c.Get("user_id")
 	caption := c.PostForm("caption")
 	visibilityStr := c.DefaultPostForm("visibility", string(domain.VisibilityPublic))
 	visibility := domain.PostVisibility(visibilityStr)
@@ -43,7 +44,7 @@ func (h *ContentHandler) CreatePost(c *gin.Context) {
 		return
 	}
 
-	post, err := h.contentService.CreatePost(c.Request.Context(), userID.(string), caption, visibility, file)
+	post, err := h.contentService.CreatePost(c.Request.Context(), userID.(primitive.ObjectID), caption, file, visibility)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create post"})
 		return
@@ -53,10 +54,14 @@ func (h *ContentHandler) CreatePost(c *gin.Context) {
 
 // DeletePost is the handler for deleting a post.
 func (h *ContentHandler) DeletePost(c *gin.Context) {
-	userID, _ := c.Get("userID")
-	postID := c.Param("postID")
+	userID, _ := c.Get("user_id")
+	postID, err := primitive.ObjectIDFromHex(c.Param("postID"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		return
+	}
 
-	if err := h.contentService.DeletePost(c.Request.Context(), userID.(string), postID); err != nil {
+	if err := h.contentService.DeletePost(c.Request.Context(), postID, userID.(primitive.ObjectID)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -66,10 +71,14 @@ func (h *ContentHandler) DeletePost(c *gin.Context) {
 
 // Repost is the handler for reposting another post.
 func (h *ContentHandler) Repost(c *gin.Context) {
-	userID, _ := c.Get("userID")
-	originalPostID := c.Param("postID")
+	userID, _ := c.Get("user_id")
+	originalPostID, err := primitive.ObjectIDFromHex(c.Param("postID"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		return
+	}
 
-	repost, err := h.contentService.Repost(c.Request.Context(), userID.(string), originalPostID)
+	repost, err := h.contentService.Repost(c.Request.Context(), userID.(primitive.ObjectID), originalPostID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -79,7 +88,11 @@ func (h *ContentHandler) Repost(c *gin.Context) {
 
 // GetRepostsByUser is the handler for getting a user's reposts.
 func (h *ContentHandler) GetRepostsByUser(c *gin.Context) {
-	userID := c.Param("userID")
+	userID, err := primitive.ObjectIDFromHex(c.Param("userID"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 
 	posts, err := h.contentService.GetRepostsByUser(c.Request.Context(), userID, limit)
@@ -92,8 +105,12 @@ func (h *ContentHandler) GetRepostsByUser(c *gin.Context) {
 
 // CreateComment is the handler for adding a comment to a post.
 func (h *ContentHandler) CreateComment(c *gin.Context) {
-	userID, _ := c.Get("userID")
-	postID := c.Param("postID")
+	userID, _ := c.Get("user_id")
+	postID, err := primitive.ObjectIDFromHex(c.Param("postID"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		return
+	}
 	var request struct {
 		Text string `json:"text" binding:"required"`
 	}
@@ -102,7 +119,7 @@ func (h *ContentHandler) CreateComment(c *gin.Context) {
 		return
 	}
 
-	comment, err := h.contentService.CreateComment(c.Request.Context(), userID.(string), postID, request.Text)
+	comment, err := h.contentService.CreateComment(c.Request.Context(), userID.(primitive.ObjectID), postID, request.Text)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create comment"})
 		return
@@ -112,10 +129,15 @@ func (h *ContentHandler) CreateComment(c *gin.Context) {
 
 // GetComments is the handler for getting comments for a post.
 func (h *ContentHandler) GetComments(c *gin.Context) {
-	postID := c.Param("postID")
+	postID, err := primitive.ObjectIDFromHex(c.Param("postID"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		return
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 
-	comments, err := h.contentService.GetComments(c.Request.Context(), postID, limit)
+	comments, err := h.contentService.GetComments(c.Request.Context(), postID, page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get comments"})
 		return
@@ -125,7 +147,11 @@ func (h *ContentHandler) GetComments(c *gin.Context) {
 
 // RecordView is the handler for recording a view on a post.
 func (h *ContentHandler) RecordView(c *gin.Context) {
-	postID := c.Param("postID")
+	postID, err := primitive.ObjectIDFromHex(c.Param("postID"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		return
+	}
 	if err := h.contentService.RecordView(c.Request.Context(), postID); err != nil {
 		// We can choose to ignore errors here or log them, but we won't send an error response
 		// to the client to avoid impacting user experience for a non-critical operation.

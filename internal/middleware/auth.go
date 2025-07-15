@@ -3,11 +3,11 @@ package middleware
 import (
 	"net/http"
 	"strings"
-	"vybes/internal/domain"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/rs/zerolog/log"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // AuthMiddleware creates a Gin middleware for JWT authentication.
@@ -60,7 +60,7 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 		// Extract claims from token
 		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 			// Extract user ID from claims
-			userIDStr, ok := claims["user_id"].(string)
+			userIDStr, ok := claims["sub"].(string)
 			if !ok {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
 				c.Abort()
@@ -68,7 +68,7 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 			}
 
 			// Parse user ID string to ObjectID
-			userID, err := domain.ParseObjectID(userIDStr)
+			userID, err := primitive.ObjectIDFromHex(userIDStr)
 			if err != nil {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID in token"})
 				c.Abort()

@@ -57,7 +57,7 @@ func (s *walletService) CreateWallet() (string, string, error) {
 
 	address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
 
-	encryptedPrivateKey, err := utils.Encrypt(privateKeyHex, s.encryptionKey)
+	encryptedPrivateKey, err := utils.Encrypt(privateKeyHex, []byte(s.encryptionKey))
 	if err != nil {
 		return "", "", err
 	}
