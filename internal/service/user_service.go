@@ -36,8 +36,9 @@ type UserProfileResponse struct {
 }
 
 type LoginResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
+	AccessToken  string     `json:"access_token"`
+	RefreshToken string     `json:"refresh_token"`
+	UserData     *domain.User `json:"user_data"`
 }
 
 // UserService defines the interface for user business logic.
@@ -154,6 +155,7 @@ func (s *userService) Login(ctx context.Context, email, password, userAgent, cli
 	return &LoginResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
+		UserData:     user,
 	}, nil
 }
 
@@ -186,6 +188,7 @@ func (s *userService) RefreshToken(ctx context.Context, refreshToken string) (*L
 	return &LoginResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
+		UserData:     user,
 	}, nil
 }
 
