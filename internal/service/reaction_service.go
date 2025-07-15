@@ -16,18 +16,18 @@ type ReactionService interface {
 }
 
 type reactionService struct {
-	reactionRepo      repository.ReactionRepository
-	contentRepo       repository.ContentRepository
-	userRepo          repository.UserRepository
+	reactionRepo          repository.ReactionRepository
+	contentRepo           repository.ContentRepository
+	userRepo              repository.UserRepository
 	notificationPublisher NotificationPublisher
 }
 
 // NewReactionService creates a new reaction service.
 func NewReactionService(reactionRepo repository.ReactionRepository, contentRepo repository.ContentRepository, userRepo repository.UserRepository, notificationPublisher NotificationPublisher) ReactionService {
 	return &reactionService{
-		reactionRepo:      reactionRepo,
-		contentRepo:       contentRepo,
-		userRepo:          userRepo,
+		reactionRepo:          reactionRepo,
+		contentRepo:           contentRepo,
+		userRepo:              userRepo,
 		notificationPublisher: notificationPublisher,
 	}
 }

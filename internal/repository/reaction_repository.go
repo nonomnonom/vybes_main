@@ -2,7 +2,7 @@ package repository
 
 import (
 	"context"
-	
+
 	"vybes/internal/domain"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -45,8 +45,7 @@ func (r *mongoReactionRepository) AddReaction(ctx context.Context, reaction *dom
 	}
 
 	// Increment the correct counter on the post
-	counterField := string(reaction.Type) + "count" // e.g., "likecount"
-	_, err = r.posts().UpdateOne(ctx, bson.M{"_id": reaction.PostID}, bson.M{"$inc": bson.M{counterField: 1}})
+	_, err = r.posts().UpdateOne(ctx, bson.M{"_id": reaction.PostID}, bson.M{"$inc": bson.M{string(reaction.Type) + "count": 1}})
 	return err
 }
 
@@ -58,8 +57,7 @@ func (r *mongoReactionRepository) RemoveReaction(ctx context.Context, userID, po
 	}
 
 	// Decrement the correct counter on the post
-	counterField := string(reactionType) + "count"
-	_, err = r.posts().UpdateOne(ctx, bson.M{"_id": postID}, bson.M{"$inc": bson.M{counterField: -1}})
+	_, err = r.posts().UpdateOne(ctx, bson.M{"_id": postID}, bson.M{"$inc": bson.M{string(reactionType) + "count": -1}})
 	return err
 }
 

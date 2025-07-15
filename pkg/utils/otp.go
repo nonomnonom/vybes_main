@@ -3,7 +3,6 @@ package utils
 import (
 	"crypto/rand"
 	"io"
-	
 )
 
 // GenerateOTP generates a random numeric OTP of a given length.

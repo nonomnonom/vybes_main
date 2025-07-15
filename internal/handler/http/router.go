@@ -1,7 +1,6 @@
 package http
 
 import (
-	
 	"vybes/internal/config"
 	"vybes/internal/middleware"
 	"vybes/internal/service"
@@ -30,14 +29,14 @@ func SetupRouter(
 	// Health check endpoint for Railway
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			"status": "healthy",
+			"status":  "healthy",
 			"service": "vybes-api",
 			"timestamp": gin.H{
 				"unix": gin.H{
 					"seconds": gin.H{
 						"value": gin.H{
-							"low": 0,
-							"high": 0,
+							"low":      0,
+							"high":     0,
 							"unsigned": false,
 						},
 					},
@@ -110,7 +109,7 @@ func SetupRouter(
 				posts.POST("/:postID/bookmark", bookmarkHandler.AddBookmark)
 				posts.DELETE("/:postID/bookmark", bookmarkHandler.RemoveBookmark)
 			}
-			
+
 			// Repost-specific routes
 			authRoutes.GET("/reposts/by-user/:userID", contentHandler.GetRepostsByUser)
 
