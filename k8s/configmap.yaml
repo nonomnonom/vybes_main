@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vybes-config
+  namespace: vybes
+data:
+  # Application configuration
+  APP_ENV: "production"
+  APP_PORT: "8080"
+  
+  # Service endpoints
+  MONGO_URI: "mongodb://mongo-service:27017"
+  REDIS_ADDR: "redis-service:6379"
+  MINIO_ENDPOINT: "minio-service:9000"
+  NATS_URL: "nats://nats-service:4222"
