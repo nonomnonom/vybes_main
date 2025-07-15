@@ -16,6 +16,7 @@ type UserRepository interface {
 	FindByID(ctx context.Context, id primitive.ObjectID) (*domain.User, error)
 	FindByEmail(ctx context.Context, email string) (*domain.User, error)
 	FindByUsername(ctx context.Context, username string) (*domain.User, error)
+	FindByVID(ctx context.Context, vid int64) (*domain.User, error)
 	FindManyByIDs(ctx context.Context, ids []primitive.ObjectID) ([]domain.User, error)
 	SearchUsers(ctx context.Context, query string, limit int) ([]domain.User, error)
 	Update(ctx context.Context, user *domain.User) error
@@ -68,6 +69,18 @@ func (r *mongoUserRepository) FindByEmail(ctx context.Context, email string) (*d
 func (r *mongoUserRepository) FindByUsername(ctx context.Context, username string) (*domain.User, error) {
 	var user domain.User
 	err := r.db.Collection(r.collection).FindOne(ctx, bson.M{"username": username}).Decode(&user)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *mongoUserRepository) FindByVID(ctx context.Context, vid int64) (*domain.User, error) {
+	var user domain.User
+	err := r.db.Collection(r.collection).FindOne(ctx, bson.M{"vid": vid}).Decode(&user)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil

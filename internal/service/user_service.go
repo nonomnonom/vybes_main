@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -17,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -35,9 +33,15 @@ type UserProfileResponse struct {
 	FriendshipStatus string `json:"friendshipStatus"`
 }
 
+type UserMinimal struct {
+	VID      int64  `json:"vid"`
+	Username string `json:"username"`
+}
+
 type LoginResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
+	AccessToken  string      `json:"access_token"`
+	RefreshToken string      `json:"refresh_token"`
+	UserData     *UserMinimal `json:"user_data"`
 }
 
 // UserService defines the interface for user business logic.
@@ -46,7 +50,7 @@ type UserService interface {
 	Login(ctx context.Context, email, password, userAgent, clientIP string) (*LoginResponse, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*LoginResponse, error)
 	UnlockWallet(ctx context.Context, userID, password string) error
-	GetUserProfile(ctx context.Context, viewerID, username string) (*UserProfileResponse, error)
+	GetUserProfile(ctx context.Context, viewerID, vid *int64, username *string) (*UserProfileResponse, error)
 	UpdateProfile(ctx context.Context, userID string, payload UpdateProfilePayload) (*domain.User, error)
 	ExportPrivateKey(ctx context.Context, userID, password string) (string, error)
 	PersonalSign(ctx context.Context, userID, message string) (string, error)
@@ -154,6 +158,7 @@ func (s *userService) Login(ctx context.Context, email, password, userAgent, cli
 	return &LoginResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
+		UserData:     &UserMinimal{VID: user.VID, Username: user.Username},
 	}, nil
 }
 
@@ -186,6 +191,7 @@ func (s *userService) RefreshToken(ctx context.Context, refreshToken string) (*L
 	return &LoginResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
+		UserData:     &UserMinimal{VID: user.VID, Username: user.Username},
 	}, nil
 }
 
@@ -213,31 +219,27 @@ func (s *userService) UnlockWallet(ctx context.Context, userIDStr, password stri
 }
 
 // GetUserProfile retrieves a user's public profile and friendship status, with caching.
-func (s *userService) GetUserProfile(ctx context.Context, viewerIDStr, username string) (*UserProfileResponse, error) {
-	cacheKey := fmt.Sprintf("profile:%s:viewer:%s", username, viewerIDStr)
+func (s *userService) GetUserProfile(ctx context.Context, viewerIDStr string, vid *int64, username *string) (*UserProfileResponse, error) {
+	var profileUser *domain.User
+	var err error
 
-	cachedData, err := s.cache.Get(ctx, cacheKey)
-	if err == nil {
-		var profile UserProfileResponse
-		if json.Unmarshal([]byte(cachedData), &profile) == nil {
-			return &profile, nil
-		}
+	if vid != nil {
+		profileUser, err = s.userRepo.FindByVID(ctx, *vid)
+	} else if username != nil {
+		profileUser, err = s.userRepo.FindByUsername(ctx, *username)
+	} else {
+		return nil, errors.New("must provide vid or username")
 	}
-	if err != redis.Nil {
-		// Log non-nil errors from Redis
-	}
-
-	viewerID, err := primitive.ObjectIDFromHex(viewerIDStr)
-	if err != nil {
-		return nil, errors.New("invalid viewer ID format")
-	}
-
-	profileUser, err := s.userRepo.FindByUsername(ctx, username)
 	if err != nil {
 		return nil, err
 	}
 	if profileUser == nil {
 		return nil, errors.New("user not found")
+	}
+
+	viewerID, err := primitive.ObjectIDFromHex(viewerIDStr)
+	if err != nil {
+		return nil, errors.New("invalid viewer ID format")
 	}
 
 	followerCount, err := s.followRepo.GetFollowerCount(ctx, profileUser.ID)
@@ -276,11 +278,6 @@ func (s *userService) GetUserProfile(ctx context.Context, viewerIDStr, username 
 		FollowerCount:    followerCount,
 		FollowingCount:   followingCount,
 		FriendshipStatus: friendshipStatus,
-	}
-
-	jsonData, err := json.Marshal(profileResponse)
-	if err == nil {
-		s.cache.Set(ctx, cacheKey, jsonData, 5*time.Minute)
 	}
 
 	return profileResponse, nil

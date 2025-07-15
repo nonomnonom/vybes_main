@@ -57,7 +57,7 @@ func SetupRouter(
 			authRoutes.GET("/search/users", searchHandler.SearchUsers)
 
 			// User profile and wallet routes
-			authRoutes.GET("/users/:username", userHandler.GetUserProfile)
+			authRoutes.GET("/users/profile", userHandler.GetUserProfile)
 			authRoutes.PATCH("/users/me", userHandler.UpdateProfile)
 			authRoutes.POST("/wallet/unlock", userHandler.UnlockWallet)
 			authRoutes.POST("/wallet/export", userHandler.ExportPrivateKey)
