@@ -45,13 +45,12 @@ REDIS_ADDR = "worker-1:6379,worker-2:6379,worker-3:6379"
 REDIS_PASSWORD = "{{REDIS_PASSWORD}}"
 REDIS_DB = "0"
 
-# MinIO Configuration (Cluster)
-MINIO_ENDPOINT = "storage-1:9000,storage-2:9000,storage-3:9000"
-MINIO_ACCESS_KEY = "{{MINIO_ACCESS_KEY}}"
-MINIO_SECRET_KEY = "{{MINIO_SECRET_KEY}}"
-MINIO_USE_SSL = "true"
-MINIO_POSTS_BUCKET = "vybes-posts"
-MINIO_STORIES_BUCKET = "vybes-stories"
+# R2 Configuration (Cloudflare R2)
+R2_ENDPOINT = "https://{{R2_ACCOUNT_ID}}.r2.cloudflarestorage.com"
+R2_ACCESS_KEY_ID = "{{R2_ACCESS_KEY_ID}}"
+R2_SECRET_ACCESS_KEY = "{{R2_SECRET_ACCESS_KEY}}"
+R2_POSTS_BUCKET = "vybes-posts"
+R2_STORIES_BUCKET = "vybes-stories"
 
 # NATS Configuration (Cluster)
 NATS_URL = "nats://worker-1:4222,nats://worker-2:4222,nats://worker-3:4222"
@@ -99,43 +98,6 @@ REDIS_PASSWORD = "{{REDIS_PASSWORD}}"
 NATS_CLUSTER_NAME = "vybes-cluster"
 NATS_CLUSTER_ID = "worker-3"
 
-# =============================================================================
-# STORAGE NODES (MinIO Cluster)
-# =============================================================================
-
-[[services]]
-name = "storage-1"
-image = "minio/minio:latest"
-environment = "production"
-
-[services.variables]
-MINIO_ROOT_USER = "{{MINIO_ACCESS_KEY}}"
-MINIO_ROOT_PASSWORD = "{{MINIO_SECRET_KEY}}"
-MINIO_CLUSTER_NAME = "vybes-storage"
-MINIO_NODE_ID = "storage-1"
-
-[[services]]
-name = "storage-2"
-image = "minio/minio:latest"
-environment = "production"
-
-[services.variables]
-MINIO_ROOT_USER = "{{MINIO_ACCESS_KEY}}"
-MINIO_ROOT_PASSWORD = "{{MINIO_SECRET_KEY}}"
-MINIO_CLUSTER_NAME = "vybes-storage"
-MINIO_NODE_ID = "storage-2"
-
-[[services]]
-name = "storage-3"
-image = "minio/minio:latest"
-environment = "production"
-
-[services.variables]
-MINIO_ROOT_USER = "{{MINIO_ACCESS_KEY}}"
-MINIO_ROOT_PASSWORD = "{{MINIO_SECRET_KEY}}"
-MINIO_CLUSTER_NAME = "vybes-storage"
-MINIO_NODE_ID = "storage-3"
-
 # Service Dependencies
 # API nodes depend on worker nodes
 [[services.dependencies]]
@@ -146,15 +108,6 @@ service = "worker-2"
 
 [[services.dependencies]]
 service = "worker-3"
-
-[[services.dependencies]]
-service = "storage-1"
-
-[[services.dependencies]]
-service = "storage-2"
-
-[[services.dependencies]]
-service = "storage-3"
 
 # Scaling Configuration
 [services.scaling]
@@ -184,14 +137,11 @@ startPeriod = "60s"
 [environments.development]
 [environments.development.variables]
 DB_NAME = "vybes_development"
-MINIO_USE_SSL = "false"
 
 [environments.staging]
 [environments.staging.variables]
 DB_NAME = "vybes_staging"
-MINIO_USE_SSL = "true"
 
 [environments.production]
 [environments.production.variables]
 DB_NAME = "vybes_production"
-MINIO_USE_SSL = "true"

@@ -19,13 +19,12 @@ type Config struct {
 	WalletEncryptionKey string
 	EthRPCURL           string
 
-	// MinIO Configuration
-	MinioEndpoint      string
-	MinioAccessKey     string
-	MinioSecretKey     string
-	MinioUseSSL        bool
-	MinioPostsBucket   string
-	MinioStoriesBucket string
+	// R2 Configuration
+	R2Endpoint        string
+	R2AccessKeyID     string
+	R2SecretAccessKey string
+	R2PostsBucket     string
+	R2StoriesBucket   string
 
 	// Redis Configuration
 	RedisAddr     string
@@ -48,11 +47,6 @@ func LoadConfig() (*Config, error) {
 		port = ":8080" // Default port
 	}
 
-	useSSL, err := strconv.ParseBool(os.Getenv("MINIO_USE_SSL"))
-	if err != nil {
-		useSSL = false // Default to false
-	}
-
 	redisDB, err := strconv.Atoi(os.Getenv("REDIS_DB"))
 	if err != nil {
 		redisDB = 0 // Default DB
@@ -67,12 +61,11 @@ func LoadConfig() (*Config, error) {
 		SenderEmail:         os.Getenv("SENDER_EMAIL"),
 		WalletEncryptionKey: os.Getenv("WALLET_ENCRYPTION_KEY"),
 		EthRPCURL:           os.Getenv("ETH_RPC_URL"),
-		MinioEndpoint:       os.Getenv("MINIO_ENDPOINT"),
-		MinioAccessKey:      os.Getenv("MINIO_ACCESS_KEY"),
-		MinioSecretKey:      os.Getenv("MINIO_SECRET_KEY"),
-		MinioUseSSL:         useSSL,
-		MinioPostsBucket:    os.Getenv("MINIO_POSTS_BUCKET"),
-		MinioStoriesBucket:  os.Getenv("MINIO_STORIES_BUCKET"),
+		R2Endpoint:          os.Getenv("R2_ENDPOINT"),
+		R2AccessKeyID:       os.Getenv("R2_ACCESS_KEY_ID"),
+		R2SecretAccessKey:   os.Getenv("R2_SECRET_ACCESS_KEY"),
+		R2PostsBucket:       os.Getenv("R2_POSTS_BUCKET"),
+		R2StoriesBucket:     os.Getenv("R2_STORIES_BUCKET"),
 		RedisAddr:           os.Getenv("REDIS_ADDR"),
 		RedisPassword:       os.Getenv("REDIS_PASSWORD"),
 		RedisDB:             redisDB,

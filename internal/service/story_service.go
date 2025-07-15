@@ -54,8 +54,8 @@ func (s *storyService) CreateStory(ctx context.Context, userIDStr string, fileHe
 	objectName := fmt.Sprintf("stories/%s/%s", userID.Hex(), uuid.New().String())
 	contentType := fileHeader.Header.Get("Content-Type")
 
-	// Upload to MinIO
-	uploadInfo, err := s.storage.UploadFile(ctx, s.cfg.MinioStoriesBucket, objectName, file, fileHeader.Size, contentType)
+	// Upload to R2
+	uploadInfo, err := s.storage.UploadFile(ctx, s.cfg.R2StoriesBucket, objectName, file, fileHeader.Size, contentType)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (s *storyService) CreateStory(ctx context.Context, userIDStr string, fileHe
 	}
 
 	if err := s.storyRepo.Create(ctx, story); err != nil {
-		// TODO: Implement logic to delete the object from MinIO if this fails
+		// TODO: Implement logic to delete the object from R2 if this fails
 		return nil, err
 	}
 

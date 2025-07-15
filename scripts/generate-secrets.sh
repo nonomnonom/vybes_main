@@ -43,18 +43,6 @@ REDIS_PASSWORD=$(openssl rand -base64 16)
 echo "REDIS_PASSWORD=$REDIS_PASSWORD"
 echo ""
 
-# Generate MinIO Access Key (16 bytes = 128 bits)
-echo "📁 MINIO_ACCESS_KEY:"
-MINIO_ACCESS_KEY=$(openssl rand -base64 16 | tr -d "=+/" | cut -c1-20)
-echo "MINIO_ACCESS_KEY=$MINIO_ACCESS_KEY"
-echo ""
-
-# Generate MinIO Secret Key (32 bytes = 256 bits)
-echo "🔒 MINIO_SECRET_KEY:"
-MINIO_SECRET_KEY=$(openssl rand -base64 32)
-echo "MINIO_SECRET_KEY=$MINIO_SECRET_KEY"
-echo ""
-
 echo "✅ All secrets generated successfully!"
 echo ""
 echo "📋 Next steps:"
@@ -65,9 +53,21 @@ echo "   - SENDER_EMAIL (your verified email domain)"
 echo "   - ETH_RPC_URL (get from Infura, Alchemy, or Ankr)"
 echo "   - MONGO_ROOT_USERNAME (e.g., 'admin')"
 echo ""
+echo "☁️  R2 Configuration (Cloudflare R2):"
+echo "1. Go to Cloudflare Dashboard > R2 Object Storage"
+echo "2. Create buckets: 'vybes-posts' and 'vybes-stories'"
+echo "3. Go to Manage R2 API tokens"
+echo "4. Create a new API token with appropriate permissions"
+echo "5. Set these variables in Railway:"
+echo "   - R2_ACCOUNT_ID (found in Cloudflare dashboard)"
+echo "   - R2_ACCESS_KEY_ID (from API token)"
+echo "   - R2_SECRET_ACCESS_KEY (from API token)"
+echo "   - R2_ENDPOINT (https://{ACCOUNT_ID}.r2.cloudflarestorage.com)"
+echo ""
 echo "🔒 Security Notes:"
 echo "- Keep these secrets secure and never commit them to version control"
 echo "- Use different secrets for development, staging, and production"
 echo "- Rotate secrets regularly in production"
+echo "- R2 credentials are managed through Cloudflare dashboard"
 echo ""
 echo "🚀 Ready to deploy on Railway!"
