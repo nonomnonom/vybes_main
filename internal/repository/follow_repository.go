@@ -2,109 +2,50 @@ package repository
 
 import (
 	"context"
+	"vybes/internal/domain"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"vybes/internal/domain"
 )
 
-// FollowRepository defines the interface for follow data operations.
+// FollowRepository defines the interface for follow relationship data operations.
+// Follow relationships represent user connections where one user follows another,
+// enabling content visibility and social interactions.
 type FollowRepository interface {
-	Follow(ctx context.Context, followerID, followingID primitive.ObjectID) error
-	Unfollow(ctx context.Context, followerID, followingID primitive.ObjectID) error
+	// CreateFollow establishes a follow relationship between two users
+	CreateFollow(ctx context.Context, follow *domain.Follow) error
+	// DeleteFollow removes a follow relationship between two users
+	DeleteFollow(ctx context.Context, followerID, followingID primitive.ObjectID) error
+	// GetFollowers retrieves all users who follow a specific user
+	GetFollowers(ctx context.Context, userID primitive.ObjectID, page, limit int) ([]domain.Follow, error)
+	// GetFollowing retrieves all users that a specific user is following
+	GetFollowing(ctx context.Context, userID primitive.ObjectID, page, limit int) ([]domain.Follow, error)
+	// IsFollowing checks if one user is following another
 	IsFollowing(ctx context.Context, followerID, followingID primitive.ObjectID) (bool, error)
+	// GetFollowerCount returns the number of followers for a user
 	GetFollowerCount(ctx context.Context, userID primitive.ObjectID) (int64, error)
+	// GetFollowingCount returns the number of users a user is following
 	GetFollowingCount(ctx context.Context, userID primitive.ObjectID) (int64, error)
-	GetFollowingIDs(ctx context.Context, userID primitive.ObjectID) ([]primitive.ObjectID, error)
-	GetFollowerIDs(ctx context.Context, userID primitive.ObjectID) ([]primitive.ObjectID, error)
 }
 
+// mongoFollowRepository implements FollowRepository using MongoDB as the backend
 type mongoFollowRepository struct {
-	db         *mongo.Database
-	collection string
+	collection *mongo.Collection
 }
 
-// NewMongoFollowRepository creates a new follow repository with MongoDB.
+// NewMongoFollowRepository creates a new follow repository instance with MongoDB backend.
+// The repository handles all follow relationship database operations including
+// creating, deleting, and querying user follow relationships.
+//
+// Parameters:
+//   - db: MongoDB database instance
+//
+// Returns:
+//   - FollowRepository: A configured follow repository ready for use
 func NewMongoFollowRepository(db *mongo.Database) FollowRepository {
 	return &mongoFollowRepository{
-		db:         db,
-		collection: "follows",
+		collection: db.Collection("follows"),
 	}
-}
-
-func (r *mongoFollowRepository) Follow(ctx context.Context, followerID, followingID primitive.ObjectID) error {
-	filter := bson.M{"followerid": followerID, "followingid": followingID}
-	update := bson.M{
-		"$setOnInsert": bson.M{
-			"_id":         primitive.NewObjectID(),
-			"followerid":  followerID,
-			"followingid": followingID,
-		},
-	}
-	opts := options.Update().SetUpsert(true)
-	_, err := r.db.Collection(r.collection).UpdateOne(ctx, filter, update, opts)
-	return err
-}
-
-func (r *mongoFollowRepository) Unfollow(ctx context.Context, followerID, followingID primitive.ObjectID) error {
-	filter := bson.M{"followerid": followerID, "followingid": followingID}
-	_, err := r.db.Collection(r.collection).DeleteOne(ctx, filter)
-	return err
-}
-
-func (r *mongoFollowRepository) IsFollowing(ctx context.Context, followerID, followingID primitive.ObjectID) (bool, error) {
-	filter := bson.M{"followerid": followerID, "followingid": followingID}
-	count, err := r.db.Collection(r.collection).CountDocuments(ctx, filter)
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
-}
-
-func (r *mongoFollowRepository) GetFollowerCount(ctx context.Context, userID primitive.ObjectID) (int64, error) {
-	filter := bson.M{"followingid": userID}
-	return r.db.Collection(r.collection).CountDocuments(ctx, filter)
-}
-
-func (r *mongoFollowRepository) GetFollowingCount(ctx context.Context, userID primitive.ObjectID) (int64, error) {
-	filter := bson.M{"followerid": userID}
-	return r.db.Collection(r.collection).CountDocuments(ctx, filter)
-}
-
-func (r *mongoFollowRepository) GetFollowingIDs(ctx context.Context, userID primitive.ObjectID) ([]primitive.ObjectID, error) {
-	filter := bson.M{"followerid": userID}
-	cursor, err := r.db.Collection(r.collection).Find(ctx, filter)
-	if err != nil {
-		return nil, err
-	}
-	defer cursor.Close(ctx)
-
-	var followingIDs []primitive.ObjectID
-	for cursor.Next(ctx) {
-		var follow domain.Follow
-		if err := cursor.Decode(&follow); err == nil {
-			followingIDs = append(followingIDs, follow.FollowingID)
-		}
-	}
-	return followingIDs, nil
-}
-
-func (r *mongoFollowRepository) GetFollowerIDs(ctx context.Context, userID primitive.ObjectID) ([]primitive.ObjectID, error) {
-	filter := bson.M{"followingid": userID}
-	cursor, err := r.db.Collection(r.collection).Find(ctx, filter)
-	if err != nil {
-		return nil, err
-	}
-	defer cursor.Close(ctx)
-
-	var followerIDs []primitive.ObjectID
-	for cursor.Next(ctx) {
-		var follow domain.Follow
-		if err := cursor.Decode(&follow); err == nil {
-			followerIDs = append(followerIDs, follow.FollowerID)
-		}
-	}
-	return followerIDs, nil
 }

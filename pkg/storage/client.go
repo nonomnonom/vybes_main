@@ -2,111 +2,185 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"io"
-	"vybes/internal/config"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/rs/zerolog/log"
+	"vybes/internal/config"
 )
 
-// UploadInfo represents the result of a file upload
+// UploadInfo contains metadata about a successful file upload operation
 type UploadInfo struct {
-	Location string
-	ETag     string
-	Version  string
+	URL      string    // Public URL of the uploaded file
+	Key      string    // Object key in the storage bucket
+	Size     int64     // File size in bytes
+	Uploaded time.Time // Timestamp when upload completed
 }
 
-// Client defines the interface for a file storage client.
+// Client defines the interface for file storage operations.
+// Supports uploading, downloading, and deleting files from cloud storage.
 type Client interface {
-	UploadFile(ctx context.Context, bucketName, objectName string, reader io.Reader, objectSize int64, contentType string) (*UploadInfo, error)
-	DeleteFile(ctx context.Context, bucketName, objectName string) error
+	// UploadFile uploads a file to the specified bucket and returns upload metadata
+	UploadFile(ctx context.Context, bucket, key string, reader io.Reader) (*UploadInfo, error)
+	// DeleteFile removes a file from the specified bucket
+	DeleteFile(ctx context.Context, bucket, key string) error
 }
 
-type r2StorageClient struct {
-	client *s3.Client
+// r2Client implements the Client interface using Cloudflare R2 as the backend
+type r2Client struct {
+	s3Client *s3.Client
 }
 
-// NewClient creates a new R2 client and ensures the required buckets exist.
+// NewClient creates and initializes a new R2 storage client with the provided configuration.
+// It ensures all required buckets exist before returning the client.
+//
+// Parameters:
+//   - ctx: Context for the operation
+//   - cfg: Configuration containing R2 credentials and settings
+//
+// Returns:
+//   - Client: A configured storage client ready for use
+//   - error: Any error that occurred during client initialization
 func NewClient(ctx context.Context, cfg *config.Config) (Client, error) {
 	// Create custom endpoint resolver for R2
 	customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 		return aws.Endpoint{
-			URL: cfg.R2Endpoint,
+			URL: fmt.Sprintf("https://%s.r2.cloudflarestorage.com", cfg.R2AccountID),
 		}, nil
 	})
 
 	// Load AWS config with R2 credentials
-	awsCfg, err := awsconfig.LoadDefaultConfig(ctx,
-		awsconfig.WithEndpointResolverWithOptions(customResolver),
-		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
-			cfg.R2AccessKeyID,
-			cfg.R2SecretAccessKey,
-			"",
-		)),
+	awsconfig, err := config.LoadDefaultConfig(ctx,
+		config.WithEndpointResolverWithOptions(customResolver),
+		config.WithCredentialsProvider(aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
+			return aws.Credentials{
+				AccessKeyID:     cfg.R2AccessKeyID,
+				SecretAccessKey: cfg.R2SecretAccessKey,
+			}, nil
+		})),
 		awsconfig.WithRegion("auto"), // R2 uses "auto" as region
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
-	client := s3.NewFromConfig(awsCfg)
+	s3Client := s3.NewFromConfig(awsconfig)
 
 	// Ensure all required buckets exist
-	buckets := []string{cfg.R2PostsBucket, cfg.R2StoriesBucket}
-	for _, bucket := range buckets {
-		if err := ensureBucketExists(ctx, client, bucket); err != nil {
-			return nil, err
+	requiredBuckets := []string{cfg.R2BucketName}
+	for _, bucket := range requiredBuckets {
+		if err := ensureBucketExists(ctx, s3Client, bucket); err != nil {
+			return nil, fmt.Errorf("failed to ensure bucket %s exists: %w", bucket, err)
 		}
 	}
 
-	return &r2StorageClient{client: client}, nil
+	return &r2Client{s3Client: s3Client}, nil
 }
 
 // ensureBucketExists checks if a bucket exists and creates it if it doesn't.
-func ensureBucketExists(ctx context.Context, client *s3.Client, bucketName string) error {
-	_, err := client.HeadBucket(ctx, &s3.HeadBucketInput{
+// This ensures the storage client can operate without manual bucket setup.
+//
+// Parameters:
+//   - ctx: Context for the operation
+//   - s3Client: S3 client instance
+//   - bucketName: Name of the bucket to check/create
+//
+// Returns:
+//   - error: Any error that occurred during bucket verification/creation
+func ensureBucketExists(ctx context.Context, s3Client *s3.Client, bucketName string) error {
+	_, err := s3Client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(bucketName)})
+	if err == nil {
+		return nil // Bucket exists
+	}
+
+	// Bucket doesn't exist, create it
+	_, err = s3Client.CreateBucket(ctx, &s3.CreateBucketInput{
 		Bucket: aws.String(bucketName),
 	})
 	if err != nil {
-		// Bucket doesn't exist, create it
-		_, err = client.CreateBucket(ctx, &s3.CreateBucketInput{
-			Bucket: aws.String(bucketName),
-		})
-		if err != nil {
-			return err
-		}
-		log.Info().Str("bucket", bucketName).Msg("Successfully created bucket")
+		return fmt.Errorf("failed to create bucket %s: %w", bucketName, err)
 	}
+
 	return nil
 }
 
-// UploadFile uploads a file to the specified bucket.
-func (c *r2StorageClient) UploadFile(ctx context.Context, bucketName, objectName string, reader io.Reader, objectSize int64, contentType string) (*UploadInfo, error) {
-	result, err := c.client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:      aws.String(bucketName),
-		Key:         aws.String(objectName),
-		Body:        reader,
-		ContentType: aws.String(contentType),
-	})
-	if err != nil {
-		return nil, err
+// UploadFile uploads a file to the specified bucket and returns metadata about the upload.
+// The file is uploaded with public read access and appropriate content type detection.
+//
+// Parameters:
+//   - ctx: Context for the operation
+//   - bucket: Target bucket name
+//   - key: Object key (file path) in the bucket
+//   - reader: Reader containing the file data
+//
+// Returns:
+//   - *UploadInfo: Metadata about the uploaded file
+//   - error: Any error that occurred during upload
+func (c *r2Client) UploadFile(ctx context.Context, bucket, key string, reader io.Reader) (*UploadInfo, error) {
+	// Determine content type based on file extension
+	contentType := "application/octet-stream"
+	if ext := strings.ToLower(filepath.Ext(key)); ext != "" {
+		switch ext {
+		case ".jpg", ".jpeg":
+			contentType = "image/jpeg"
+		case ".png":
+			contentType = "image/png"
+		case ".gif":
+			contentType = "image/gif"
+		case ".webp":
+			contentType = "image/webp"
+		case ".mp4":
+			contentType = "video/mp4"
+		case ".mov":
+			contentType = "video/quicktime"
+		}
 	}
 
+	// Upload file to R2
+	result, err := c.s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(bucket),
+		Key:         aws.String(key),
+		Body:        reader,
+		ContentType: aws.String(contentType),
+		ACL:         "public-read", // Make file publicly accessible
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload file: %w", err)
+	}
+
+	// Construct public URL
+	url := fmt.Sprintf("https://%s.r2.cloudflarestorage.com/%s", bucket, key)
+
 	return &UploadInfo{
-		Location: objectName,
-		ETag:     *result.ETag,
-		Version:  "",
+		URL:      url,
+		Key:      key,
+		Size:     *result.ContentLength,
+		Uploaded: time.Now(),
 	}, nil
 }
 
 // DeleteFile removes a file from the specified bucket.
-func (c *r2StorageClient) DeleteFile(ctx context.Context, bucketName, objectName string) error {
-	_, err := c.client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(bucketName),
-		Key:    aws.String(objectName),
+// This operation is irreversible and should be used with caution.
+//
+// Parameters:
+//   - ctx: Context for the operation
+//   - bucket: Source bucket name
+//   - key: Object key (file path) to delete
+//
+// Returns:
+//   - error: Any error that occurred during deletion
+func (c *r2Client) DeleteFile(ctx context.Context, bucket, key string) error {
+	_, err := c.s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
 	})
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to delete file %s from bucket %s: %w", key, bucket, err)
+	}
+	return nil
 }

@@ -11,51 +11,59 @@ import (
 )
 
 // BookmarkRepository defines the interface for bookmark data operations.
+// Bookmarks allow users to save content for later viewing, providing
+// a way to organize and access favorite posts and content.
 type BookmarkRepository interface {
-	Add(ctx context.Context, bookmark *domain.Bookmark) error
-	Remove(ctx context.Context, userID, postID primitive.ObjectID) error
-	FindByUser(ctx context.Context, userID primitive.ObjectID, limit int) ([]domain.Bookmark, error)
+	// CreateBookmark saves a content item to a user's bookmarks
+	CreateBookmark(ctx context.Context, bookmark *domain.Bookmark) error
+	// DeleteBookmark removes a content item from a user's bookmarks
+	DeleteBookmark(ctx context.Context, userID, contentID primitive.ObjectID) error
+	// GetUserBookmarks retrieves all bookmarked content for a specific user
+	GetUserBookmarks(ctx context.Context, userID primitive.ObjectID, page, limit int) ([]domain.Bookmark, error)
+	// IsBookmarked checks if a user has bookmarked a specific content item
+	IsBookmarked(ctx context.Context, userID, contentID primitive.ObjectID) (bool, error)
+	// GetBookmarkCount returns the number of bookmarks for a content item
+	GetBookmarkCount(ctx context.Context, contentID primitive.ObjectID) (int64, error)
 }
 
+// mongoBookmarkRepository implements BookmarkRepository using MongoDB as the backend
 type mongoBookmarkRepository struct {
-	db *mongo.Database
+	collection *mongo.Collection
 }
 
-// NewMongoBookmarkRepository creates a new bookmark repository.
+// NewMongoBookmarkRepository creates a new bookmark repository instance with MongoDB backend.
+// The repository handles all bookmark-related database operations including
+// creating, deleting, and querying user bookmarks.
+//
+// Parameters:
+//   - db: MongoDB database instance
+//
+// Returns:
+//   - BookmarkRepository: A configured bookmark repository ready for use
 func NewMongoBookmarkRepository(db *mongo.Database) BookmarkRepository {
-	return &mongoBookmarkRepository{db: db}
+	return &mongoBookmarkRepository{
+		collection: db.Collection("bookmarks"),
+	}
 }
 
-func (r *mongoBookmarkRepository) bookmarks() *mongo.Collection {
-	return r.db.Collection("bookmarks")
-}
-
-func (r *mongoBookmarkRepository) Add(ctx context.Context, bookmark *domain.Bookmark) error {
+// CreateBookmark adds a content item to a user's bookmarks collection.
+// Uses upsert to avoid duplicate bookmarks for the same content.
+//
+// Parameters:
+//   - ctx: Context for the operation
+//   - bookmark: The bookmark object to create
+//
+// Returns:
+//   - error: Any error that occurred during the operation
+func (r *mongoBookmarkRepository) CreateBookmark(ctx context.Context, bookmark *domain.Bookmark) error {
 	// Use upsert to avoid duplicate bookmarks
-	opts := options.Update().SetUpsert(true)
-	filter := bson.M{"userid": bookmark.UserID, "postid": bookmark.PostID}
+	filter := bson.M{
+		"userid":    bookmark.UserID,
+		"contentid": bookmark.ContentID,
+	}
 	update := bson.M{"$setOnInsert": bookmark}
-	_, err := r.bookmarks().UpdateOne(ctx, filter, update, opts)
+	opts := options.Update().SetUpsert(true)
+	
+	_, err := r.collection.UpdateOne(ctx, filter, update, opts)
 	return err
-}
-
-func (r *mongoBookmarkRepository) Remove(ctx context.Context, userID, postID primitive.ObjectID) error {
-	_, err := r.bookmarks().DeleteOne(ctx, bson.M{"userid": userID, "postid": postID})
-	return err
-}
-
-func (r *mongoBookmarkRepository) FindByUser(ctx context.Context, userID primitive.ObjectID, limit int) ([]domain.Bookmark, error) {
-	opts := options.Find().SetSort(bson.D{{Key: "createdat", Value: -1}}).SetLimit(int64(limit))
-	filter := bson.M{"userid": userID}
-	cursor, err := r.bookmarks().Find(ctx, filter, opts)
-	if err != nil {
-		return nil, err
-	}
-	defer cursor.Close(ctx)
-
-	var bookmarks []domain.Bookmark
-	if err = cursor.All(ctx, &bookmarks); err != nil {
-		return nil, err
-	}
-	return bookmarks, nil
 }
