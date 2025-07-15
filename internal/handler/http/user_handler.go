@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	
 	"vybes/internal/service"
@@ -101,8 +102,27 @@ func (h *UserHandler) GetUserProfile(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in token"})
 		return
 	}
-	username := c.Param("username")
-	profile, err := h.userService.GetUserProfile(c.Request.Context(), viewerID.(string), username)
+
+	var vidPtr *int64
+	var usernamePtr *string
+
+	if vidStr := c.Query("vid"); vidStr != "" {
+		var vid int64
+		_, err := fmt.Sscanf(vidStr, "%d", &vid)
+		if err == nil {
+			vidPtr = &vid
+		}
+	}
+	if username := c.Query("username"); username != "" {
+		usernamePtr = &username
+	}
+
+	if vidPtr == nil && usernamePtr == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Must provide vid or username as query param"})
+		return
+	}
+
+	profile, err := h.userService.GetUserProfile(c.Request.Context(), viewerID.(string), vidPtr, usernamePtr)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
