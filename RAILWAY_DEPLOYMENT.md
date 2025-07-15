@@ -6,31 +6,25 @@ The Vybes application is designed as a microservices architecture with the follo
 
 ### Core Services
 
-1. **vybes-api** (Main Application)
-   - Go-based REST API using Gin framework
+1. **API Nodes** (Load Balanced)
+   - **api-1** & **api-2**: Go-based REST API using Gin framework
    - Handles user authentication, content management, social features
    - Port: 8080
    - Health check endpoint: `/health`
+   - Load balanced for high availability
 
-2. **mongodb** (Database)
-   - MongoDB 7.0 for data persistence
-   - Stores user profiles, posts, stories, notifications, etc.
-   - Port: 27017
+2. **Worker Nodes** (MongoDB + Redis + NATS Cluster)
+   - **worker-1**, **worker-2**, **worker-3**: Combined database, cache, and message queue
+   - MongoDB 7.0 replica set for data persistence
+   - Redis cluster for session management and caching
+   - NATS cluster for real-time notifications
+   - High availability with automatic failover
 
-3. **redis** (Cache)
-   - Redis 7.2 for session management and caching
-   - Improves performance for frequently accessed data
-   - Port: 6379
-
-4. **minio** (Object Storage)
-   - MinIO for file storage (posts, stories, user avatars)
-   - S3-compatible object storage
+3. **Storage Nodes** (MinIO Cluster)
+   - **storage-1**, **storage-2**, **storage-3**: Distributed object storage
+   - MinIO cluster for file storage (posts, stories, user avatars)
+   - S3-compatible object storage with replication
    - Ports: 9000 (API), 9001 (Console)
-
-5. **nats** (Message Queue)
-   - NATS 2.10 for real-time notifications
-   - Handles async notification processing
-   - Ports: 4222 (Client), 8222 (Monitoring)
 
 ## Railway Configuration
 
@@ -141,12 +135,12 @@ railway logs
 
 ### Internal Networking
 
-Services communicate using Railway's internal networking:
+Services communicate using Railway's internal networking with cluster endpoints:
 
-- **MongoDB**: `mongodb://mongodb:27017`
-- **Redis**: `redis:6379`
-- **MinIO**: `minio:9000`
-- **NATS**: `nats://nats:4222`
+- **MongoDB Cluster**: `mongodb://worker-1:27017,worker-2:27017,worker-3:27017/vybes_production?replicaSet=vybes-rs`
+- **Redis Cluster**: `worker-1:6379,worker-2:6379,worker-3:6379`
+- **MinIO Cluster**: `storage-1:9000,storage-2:9000,storage-3:9000`
+- **NATS Cluster**: `nats://worker-1:4222,nats://worker-2:4222,nats://worker-3:4222`
 
 ### Health Checks
 
