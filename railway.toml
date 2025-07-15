@@ -1,0 +1,197 @@
+[build]
+builder = "dockerfile"
+
+[deploy]
+startCommand = "./vybes-api"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10
+
+# =============================================================================
+# API NODES (Load Balanced)
+# =============================================================================
+
+[[services]]
+name = "api-1"
+source = "."
+environment = "production"
+
+[[services]]
+name = "api-2"
+source = "."
+environment = "production"
+
+[services.variables]
+PORT = ":8080"
+DB_NAME = "vybes_production"
+
+# JWT and Security
+JWT_SECRET = "{{JWT_SECRET}}"
+WALLET_ENCRYPTION_KEY = "{{WALLET_ENCRYPTION_KEY}}"
+
+# Email Service (Resend)
+RESEND_API_KEY = "{{RESEND_API_KEY}}"
+SENDER_EMAIL = "{{SENDER_EMAIL}}"
+
+# Ethereum Configuration
+ETH_RPC_URL = "{{ETH_RPC_URL}}"
+
+# MongoDB Configuration (Cluster)
+MONGO_URI = "mongodb://worker-1:27017,worker-2:27017,worker-3:27017/vybes_production?replicaSet=vybes-rs"
+
+# Redis Configuration (Cluster)
+REDIS_ADDR = "worker-1:6379,worker-2:6379,worker-3:6379"
+REDIS_PASSWORD = "{{REDIS_PASSWORD}}"
+REDIS_DB = "0"
+
+# MinIO Configuration (Cluster)
+MINIO_ENDPOINT = "storage-1:9000,storage-2:9000,storage-3:9000"
+MINIO_ACCESS_KEY = "{{MINIO_ACCESS_KEY}}"
+MINIO_SECRET_KEY = "{{MINIO_SECRET_KEY}}"
+MINIO_USE_SSL = "true"
+MINIO_POSTS_BUCKET = "vybes-posts"
+MINIO_STORIES_BUCKET = "vybes-stories"
+
+# NATS Configuration (Cluster)
+NATS_URL = "nats://worker-1:4222,nats://worker-2:4222,nats://worker-3:4222"
+
+# =============================================================================
+# WORKER NODES (MongoDB + Redis + NATS)
+# =============================================================================
+
+[[services]]
+name = "worker-1"
+image = "mongo:7.0"
+environment = "production"
+
+[services.variables]
+MONGO_INITDB_ROOT_USERNAME = "{{MONGO_ROOT_USERNAME}}"
+MONGO_INITDB_ROOT_PASSWORD = "{{MONGO_ROOT_PASSWORD}}"
+MONGO_INITDB_DATABASE = "vybes_production"
+REDIS_PASSWORD = "{{REDIS_PASSWORD}}"
+NATS_CLUSTER_NAME = "vybes-cluster"
+NATS_CLUSTER_ID = "worker-1"
+
+[[services]]
+name = "worker-2"
+image = "mongo:7.0"
+environment = "production"
+
+[services.variables]
+MONGO_INITDB_ROOT_USERNAME = "{{MONGO_ROOT_USERNAME}}"
+MONGO_INITDB_ROOT_PASSWORD = "{{MONGO_ROOT_PASSWORD}}"
+MONGO_INITDB_DATABASE = "vybes_production"
+REDIS_PASSWORD = "{{REDIS_PASSWORD}}"
+NATS_CLUSTER_NAME = "vybes-cluster"
+NATS_CLUSTER_ID = "worker-2"
+
+[[services]]
+name = "worker-3"
+image = "mongo:7.0"
+environment = "production"
+
+[services.variables]
+MONGO_INITDB_ROOT_USERNAME = "{{MONGO_ROOT_USERNAME}}"
+MONGO_INITDB_ROOT_PASSWORD = "{{MONGO_ROOT_PASSWORD}}"
+MONGO_INITDB_DATABASE = "vybes_production"
+REDIS_PASSWORD = "{{REDIS_PASSWORD}}"
+NATS_CLUSTER_NAME = "vybes-cluster"
+NATS_CLUSTER_ID = "worker-3"
+
+# =============================================================================
+# STORAGE NODES (MinIO Cluster)
+# =============================================================================
+
+[[services]]
+name = "storage-1"
+image = "minio/minio:latest"
+environment = "production"
+
+[services.variables]
+MINIO_ROOT_USER = "{{MINIO_ACCESS_KEY}}"
+MINIO_ROOT_PASSWORD = "{{MINIO_SECRET_KEY}}"
+MINIO_CLUSTER_NAME = "vybes-storage"
+MINIO_NODE_ID = "storage-1"
+
+[[services]]
+name = "storage-2"
+image = "minio/minio:latest"
+environment = "production"
+
+[services.variables]
+MINIO_ROOT_USER = "{{MINIO_ACCESS_KEY}}"
+MINIO_ROOT_PASSWORD = "{{MINIO_SECRET_KEY}}"
+MINIO_CLUSTER_NAME = "vybes-storage"
+MINIO_NODE_ID = "storage-2"
+
+[[services]]
+name = "storage-3"
+image = "minio/minio:latest"
+environment = "production"
+
+[services.variables]
+MINIO_ROOT_USER = "{{MINIO_ACCESS_KEY}}"
+MINIO_ROOT_PASSWORD = "{{MINIO_SECRET_KEY}}"
+MINIO_CLUSTER_NAME = "vybes-storage"
+MINIO_NODE_ID = "storage-3"
+
+# Service Dependencies
+# API nodes depend on worker nodes
+[[services.dependencies]]
+service = "worker-1"
+
+[[services.dependencies]]
+service = "worker-2"
+
+[[services.dependencies]]
+service = "worker-3"
+
+[[services.dependencies]]
+service = "storage-1"
+
+[[services.dependencies]]
+service = "storage-2"
+
+[[services.dependencies]]
+service = "storage-3"
+
+# Scaling Configuration
+[services.scaling]
+minReplicas = 1
+maxReplicas = 10
+targetCPUUtilizationPercentage = 80
+targetMemoryUtilizationPercentage = 85
+
+# Resource Limits - Let Railway auto-scale based on demand
+# Railway will automatically allocate resources based on actual usage
+# No need to set fixed limits for better performance
+
+# Network Configuration
+[services.network]
+port = 8080
+protocol = "http"
+
+# Health Check Configuration
+[services.healthcheck]
+path = "/health"
+interval = "30s"
+timeout = "10s"
+retries = 3
+startPeriod = "60s"
+
+# Environment-specific configurations
+[environments.development]
+[environments.development.variables]
+DB_NAME = "vybes_development"
+MINIO_USE_SSL = "false"
+
+[environments.staging]
+[environments.staging.variables]
+DB_NAME = "vybes_staging"
+MINIO_USE_SSL = "true"
+
+[environments.production]
+[environments.production.variables]
+DB_NAME = "vybes_production"
+MINIO_USE_SSL = "true"

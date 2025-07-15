@@ -27,6 +27,25 @@ func SetupRouter(
 ) *gin.Engine {
 	router := gin.Default()
 
+	// Health check endpoint for Railway
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"status": "healthy",
+			"service": "vybes-api",
+			"timestamp": gin.H{
+				"unix": gin.H{
+					"seconds": gin.H{
+						"value": gin.H{
+							"low": 0,
+							"high": 0,
+							"unsigned": false,
+						},
+					},
+				},
+			},
+		})
+	})
+
 	// API v1 routes
 	apiV1 := router.Group("/api/v1")
 	{

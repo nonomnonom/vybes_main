@@ -1,0 +1,46 @@
+# Git
+.git/
+.gitignore
+
+# Documentation
+docs/
+README.md
+
+# Development files
+.env
+.env.local
+.env.development
+.env.test
+
+# Test files
+test/
+*_test.go
+test_*.go
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+
+# Docker files (not needed for Railway)
+docker-compose.yml
+docker-compose.*.yml
+
+# Makefile (not needed in production)
+Makefile
+
+# Development scripts
+scripts/
