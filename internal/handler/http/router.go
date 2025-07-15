@@ -1,9 +1,9 @@
 package http
 
 import (
-	
 	"vybes/internal/config"
 	"vybes/internal/middleware"
+	"vybes/pkg/cache"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/time/rate"
@@ -21,6 +21,8 @@ func SetupRouter(
 	bookmarkHandler *BookmarkHandler,
 	searchHandler *SearchHandler,
 	notificationHandler *NotificationHandler,
+	walletSecurityHandler *WalletSecurityHandler,
+	cacheClient cache.Client,
 	cfg *config.Config,
 ) *gin.Engine {
 	router := gin.Default()
@@ -56,15 +58,40 @@ func SetupRouter(
 			// Search routes
 			authRoutes.GET("/search/users", searchHandler.SearchUsers)
 
-			// User profile and wallet routes
+			// User profile routes
 			authRoutes.GET("/users/:username", userHandler.GetUserProfile)
 			authRoutes.PATCH("/users/me", userHandler.UpdateProfile)
+			
+			// Legacy wallet routes (deprecated - use secure wallet routes instead)
 			authRoutes.POST("/wallet/export", userHandler.ExportPrivateKey)
 			authRoutes.POST("/wallet/personal-sign", userHandler.PersonalSign)
 			authRoutes.POST("/wallet/sign-transaction", userHandler.SignTransaction)
 			authRoutes.POST("/wallet/send-transaction", userHandler.SendTransaction)
 			authRoutes.POST("/wallet/sign-typed-data", userHandler.SignTypedDataV4)
 			authRoutes.POST("/wallet/secp256k1-sign", userHandler.Secp256k1Sign)
+			
+			// Secure wallet routes with session management
+			walletRoutes := authRoutes.Group("/wallet/secure")
+			{
+				walletRoutes.POST("/session", walletSecurityHandler.CreateWalletSession)
+				walletRoutes.DELETE("/session", walletSecurityHandler.RevokeWalletSession)
+				walletRoutes.DELETE("/sessions", walletSecurityHandler.RevokeAllSessions)
+				walletRoutes.GET("/nonce", walletSecurityHandler.GetNextNonce)
+				walletRoutes.GET("/audit-logs", walletSecurityHandler.GetWalletAuditLogs)
+			}
+			
+			// Wallet operations with session authentication
+			walletOpsRoutes := authRoutes.Group("/wallet/ops")
+			walletOpsRoutes.Use(middleware.WalletAuthMiddleware(walletSecurityHandler.walletSecurityService))
+			walletOpsRoutes.Use(middleware.WalletRateLimitMiddleware(cacheClient))
+			walletOpsRoutes.Use(middleware.WalletAuditMiddleware(walletSecurityHandler.walletSecurityService))
+			{
+				walletOpsRoutes.POST("/personal-sign", walletSecurityHandler.PersonalSignWithSession)
+				walletOpsRoutes.POST("/sign-transaction", walletSecurityHandler.SignTransactionWithSession)
+				walletOpsRoutes.POST("/send-transaction", walletSecurityHandler.SendTransactionWithSession)
+				walletOpsRoutes.POST("/sign-typed-data", walletSecurityHandler.SignTypedDataV4WithSession)
+				walletOpsRoutes.POST("/secp256k1-sign", walletSecurityHandler.Secp256k1SignWithSession)
+			}
 
 			// Follow routes
 			authRoutes.POST("/users/:username/follow", followHandler.FollowUser)
