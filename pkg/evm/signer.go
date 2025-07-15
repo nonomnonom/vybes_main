@@ -89,7 +89,6 @@ func (s *Signer) Secp256k1Sign(hash []byte) (string, error) {
 	return hexutil.Encode(signature), nil
 }
 
-
 // Helper function to get chain ID from transaction.
 func (s *Signer) getChainIDFromTx(tx *types.Transaction) (*big.Int, error) {
 	if tx.ChainId() == nil {

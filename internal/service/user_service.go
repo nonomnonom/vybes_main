@@ -28,8 +28,8 @@ type UpdateProfilePayload struct {
 }
 type UserProfileResponse struct {
 	domain.User
-	FollowerCount   int64  `json:"followerCount"`
-	FollowingCount  int64  `json:"followingCount"`
+	FollowerCount    int64  `json:"followerCount"`
+	FollowingCount   int64  `json:"followingCount"`
 	FriendshipStatus string `json:"friendshipStatus"`
 }
 
@@ -39,8 +39,8 @@ type UserMinimal struct {
 }
 
 type LoginResponse struct {
-	AccessToken  string      `json:"access_token"`
-	RefreshToken string      `json:"refresh_token"`
+	AccessToken  string       `json:"access_token"`
+	RefreshToken string       `json:"refresh_token"`
 	UserData     *UserMinimal `json:"user_data"`
 }
 
@@ -299,7 +299,6 @@ func (s *userService) UpdateProfile(ctx context.Context, userID string, payload 
 
 	cacheKey := fmt.Sprintf("profile:%s:viewer:%s", user.Username, userID)
 	s.cache.Del(ctx, cacheKey)
-
 
 	if payload.Username != nil {
 		user.Username = *payload.Username

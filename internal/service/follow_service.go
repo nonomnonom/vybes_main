@@ -16,16 +16,16 @@ type FollowService interface {
 }
 
 type followService struct {
-	followRepo          repository.FollowRepository
-	userRepo            repository.UserRepository
+	followRepo            repository.FollowRepository
+	userRepo              repository.UserRepository
 	notificationPublisher NotificationPublisher
 }
 
 // NewFollowService creates a new follow service.
 func NewFollowService(followRepo repository.FollowRepository, userRepo repository.UserRepository, notificationPublisher NotificationPublisher) FollowService {
 	return &followService{
-		followRepo:          followRepo,
-		userRepo:            userRepo,
+		followRepo:            followRepo,
+		userRepo:              userRepo,
 		notificationPublisher: notificationPublisher,
 	}
 }

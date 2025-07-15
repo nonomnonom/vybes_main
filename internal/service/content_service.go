@@ -28,21 +28,21 @@ type ContentService interface {
 }
 
 type contentService struct {
-	contentRepo      repository.ContentRepository
-	userRepo         repository.UserRepository
-	storage          storage.Client
+	contentRepo           repository.ContentRepository
+	userRepo              repository.UserRepository
+	storage               storage.Client
 	notificationPublisher NotificationPublisher
-	cfg              *config.Config
+	cfg                   *config.Config
 }
 
 // NewContentService creates a new content service.
 func NewContentService(contentRepo repository.ContentRepository, userRepo repository.UserRepository, storage storage.Client, notificationPublisher NotificationPublisher, cfg *config.Config) ContentService {
 	return &contentService{
-		contentRepo:      contentRepo,
-		userRepo:         userRepo,
-		storage:          storage,
+		contentRepo:           contentRepo,
+		userRepo:              userRepo,
+		storage:               storage,
 		notificationPublisher: notificationPublisher,
-		cfg:              cfg,
+		cfg:                   cfg,
 	}
 }
 
@@ -183,7 +183,7 @@ func (s *contentService) Repost(ctx context.Context, userIDStr, originalPostIDSt
 	if err := s.contentRepo.IncrementRepostCount(ctx, originalPost.ID); err != nil {
 		// Log this error
 	}
-	
+
 	if err := s.userRepo.IncrementPostCount(ctx, userID, 1); err != nil {
 		// Log this error
 	}

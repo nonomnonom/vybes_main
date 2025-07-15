@@ -14,17 +14,17 @@ import (
 
 // CronService manages scheduled tasks.
 type CronService struct {
-	cfg        *config.Config
-	storyRepo  repository.StoryRepository
-	storage    storage.Client
+	cfg       *config.Config
+	storyRepo repository.StoryRepository
+	storage   storage.Client
 }
 
 // NewCronService creates a new cron service.
 func NewCronService(cfg *config.Config, storyRepo repository.StoryRepository, storage storage.Client) *CronService {
 	return &CronService{
-		cfg:        cfg,
-		storyRepo:  storyRepo,
-		storage:    storage,
+		cfg:       cfg,
+		storyRepo: storyRepo,
+		storage:   storage,
 	}
 }
 

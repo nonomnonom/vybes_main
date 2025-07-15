@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	
+
 	"vybes/internal/service"
 
 	"github.com/ethereum/go-ethereum/core/types"
